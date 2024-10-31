@@ -2,7 +2,7 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-import typing as T
+import typing
 from dataclasses import dataclass
 
 import torch
@@ -24,7 +24,7 @@ from .trunk import FoldingTrunk, FoldingTrunkConfig
 @dataclass
 class ESMFoldConfig:
     use_esm_attn_map: bool = True
-    trunk: T.Any = FoldingTrunkConfig()
+    trunk: typing.Any = FoldingTrunkConfig()
     lddt_head_hid_dim: int = 128
 
 
@@ -128,10 +128,10 @@ class ESMFold(nn.Module):
     def forward(
         self,
         aa: torch.Tensor,
-        mask: T.Optional[torch.Tensor] = None,
-        residx: T.Optional[torch.Tensor] = None,
-        masking_pattern: T.Optional[torch.Tensor] = None,
-        num_recycles: T.Optional[int] = None,
+        mask: torch.Tensor | None = None,
+        residx: torch.Tensor | None = None,
+        masking_pattern: torch.Tensor | None = None,
+        num_recycles: int | None = None,
     ):
         """Runs a forward pass given input tokens. Use `model.infer` to
         run inference from a sequence.
@@ -246,12 +246,12 @@ class ESMFold(nn.Module):
     @torch.no_grad()
     def infer(
         self,
-        sequences: T.Union[str, T.List[str]],
+        sequences: str | list[str],
         residx=None,
-        masking_pattern: T.Optional[torch.Tensor] = None,
-        num_recycles: T.Optional[int] = None,
-        residue_index_offset: T.Optional[int] = 512,
-        chain_linker: T.Optional[str] = "G" * 25,
+        masking_pattern: torch.Tensor | None = None,
+        num_recycles: int | None = None,
+        residue_index_offset: int | None = 512,
+        chain_linker: str | None = "G" * 25,
     ):
         """Runs a forward pass given input sequences.
 
@@ -300,11 +300,11 @@ class ESMFold(nn.Module):
 
         return output
 
-    def output_to_pdb(self, output: T.Dict) -> T.List[str]:
+    def output_to_pdb(self, output: dict) -> list[str]:
         """Returns the pbd (file) string from the model given the model output."""
         return output_to_pdb(output)
 
-    def infer_pdbs(self, seqs: T.List[str], *args, **kwargs) -> T.List[str]:
+    def infer_pdbs(self, seqs: list[str], *args, **kwargs) -> list[str]:
         """Returns list of pdb (files) strings from the model given a list of input sequences."""
         output = self.infer(seqs, *args, **kwargs)
         return self.output_to_pdb(output)
@@ -313,7 +313,7 @@ class ESMFold(nn.Module):
         """Returns the pdb (file) string from the model given an input sequence."""
         return self.infer_pdbs([sequence], *args, **kwargs)[0]
 
-    def set_chunk_size(self, chunk_size: T.Optional[int]):
+    def set_chunk_size(self, chunk_size: int | None):
         # This parameter means the axial attention will be computed
         # in a chunked manner. This should make the memory used more or less O(L) instead of O(L^2).
         # It's equivalent to running a for loop over chunks of the dimension we're iterative over,
