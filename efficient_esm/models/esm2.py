@@ -45,7 +45,7 @@ class ESM2(nn.Module):
             state_dict = {pattern.sub("", name): param for name, param in state_dict.items()}
             return state_dict
 
-        model_data = torch.load(path, map_location="cpu")
+        model_data = torch.load(path, map_location="cpu", weights_only=False)
         cfg = model_data["cfg"]["model"]
         state_dict = model_data["model"]
         state_dict = upgrade_state_dict(state_dict)
