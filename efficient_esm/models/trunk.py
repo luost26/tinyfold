@@ -4,9 +4,8 @@ from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
-from openfold.model.structure_module import StructureModule
 
-# from .tri_self_attn_block import TriangularSelfAttentionBlock
+from .structure_module import StructureModule
 
 
 @dataclass

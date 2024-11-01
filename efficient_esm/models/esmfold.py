@@ -13,12 +13,10 @@ from efficient_esm.data.alphabet import Alphabet
 
 from .esm2 import ESM2
 from .folding import residue_constants
-from .folding.categorical_mixture import categorical_lddt
 from .folding.misc import batch_encode_sequences, collate_dense_tensors, output_to_pdb
 from .folding.openfold_data_transforms import make_atom14_masks
+from .heads import categorical_lddt
 from .trunk import FoldingTrunk, FoldingTrunkConfig
-
-# from openfold.utils.loss import compute_predicted_aligned_error, compute_tm
 
 
 @dataclass
