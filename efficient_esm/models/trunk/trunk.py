@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from openfold.model.structure_module import StructureModule
 
-from .tri_self_attn_block import TriangularSelfAttentionBlock
+# from .tri_self_attn_block import TriangularSelfAttentionBlock
 
 
 @dataclass
@@ -114,22 +114,8 @@ class FoldingTrunk(nn.Module):
 
         assert c_s % self.cfg.sequence_head_width == 0
         assert c_z % self.cfg.pairwise_head_width == 0
-        block = TriangularSelfAttentionBlock
 
         self.pairwise_positional_embedding = RelativePosition(self.cfg.position_bins, c_z)
-
-        self.blocks = nn.ModuleList(
-            [
-                block(
-                    sequence_state_dim=c_s,
-                    pairwise_state_dim=c_z,
-                    sequence_head_width=self.cfg.sequence_head_width,
-                    pairwise_head_width=self.cfg.pairwise_head_width,
-                    dropout=self.cfg.dropout,
-                )
-                for i in range(self.cfg.num_blocks)
-            ]
-        )
 
         self.recycle_bins = 15
         self.recycle_s_norm = nn.LayerNorm(c_s)
@@ -172,13 +158,6 @@ class FoldingTrunk(nn.Module):
             assert no_recycles >= 0, "Number of recycles must not be negative."
             no_recycles += 1  # First 'recycle' is just the standard forward pass through the model.
 
-        def trunk_iter(s, z, residx, mask):
-            z = z + self.pairwise_positional_embedding(residx, mask=mask)
-
-            for block in self.blocks:
-                s, z = block(s, z, mask=mask, residue_index=residx, chunk_size=self.chunk_size)
-            return s, z
-
         s_s = s_s_0
         s_z = s_z_0
         recycle_s = torch.zeros_like(s_s)
@@ -193,7 +172,8 @@ class FoldingTrunk(nn.Module):
                 recycle_z = self.recycle_z_norm(recycle_z.detach())
                 recycle_z += self.recycle_disto(recycle_bins.detach())
 
-                s_s, s_z = trunk_iter(s_s_0 + recycle_s, s_z_0 + recycle_z, residx, mask)
+                s_s = s_s_0 + recycle_s
+                s_z = s_z_0 + recycle_z + self.pairwise_positional_embedding(residx, mask=mask)
 
                 # === Structure module ===
                 structure = self.structure_module(

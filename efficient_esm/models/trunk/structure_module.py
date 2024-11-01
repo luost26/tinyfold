@@ -20,23 +20,24 @@ from operator import mul
 
 import torch
 import torch.nn as nn
-from openfold.np.residue_constants import (
+from torch.nn import LayerNorm, Linear
+
+from efficient_esm.models.folding.openfold_feats import (
+    frames_and_literature_positions_to_atom14_pos,
+    torsion_angles_to_frames,
+)
+from efficient_esm.models.folding.openfold_rigid_utils import Rigid, Rotation
+from efficient_esm.models.folding.openfold_tensor_utils import (
+    dict_multimap,
+    flatten_final_dims,
+    permute_final_dims,
+)
+from efficient_esm.models.folding.residue_constants import (
     restype_atom14_mask,
     restype_atom14_rigid_group_positions,
     restype_atom14_to_rigid_group,
     restype_rigid_group_default_frame,
 )
-from openfold.utils.feats import (
-    frames_and_literature_positions_to_atom14_pos,
-    torsion_angles_to_frames,
-)
-from openfold.utils.rigid_utils import Rigid, Rotation
-from openfold.utils.tensor_utils import (
-    dict_multimap,
-    flatten_final_dims,
-    permute_final_dims,
-)
-from torch.nn import LayerNorm, Linear
 
 attn_core_inplace_cuda = importlib.import_module("attn_core_inplace_cuda")
 
