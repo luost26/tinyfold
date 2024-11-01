@@ -1,9 +1,6 @@
 # mypy: ignore-errors
-import importlib
 import math
 from collections.abc import Sequence
-from functools import reduce
-from operator import mul
 
 import torch
 import torch.nn as nn
@@ -26,8 +23,6 @@ from efficient_esm.models.openfold.tensor_utils import (
     permute_final_dims,
 )
 
-attn_core_inplace_cuda = importlib.import_module("attn_core_inplace_cuda")
-
 
 class AngleResnetBlock(nn.Module):
     def __init__(self, c_hidden):
@@ -40,8 +35,8 @@ class AngleResnetBlock(nn.Module):
 
         self.c_hidden = c_hidden
 
-        self.linear_1 = Linear(self.c_hidden, self.c_hidden, init="relu")
-        self.linear_2 = Linear(self.c_hidden, self.c_hidden, init="final")
+        self.linear_1 = Linear(self.c_hidden, self.c_hidden)
+        self.linear_2 = Linear(self.c_hidden, self.c_hidden)
 
         self.relu = nn.ReLU()
 
@@ -205,7 +200,7 @@ class InvariantPointAttention(nn.Module):
         # ipa_point_weights_init_(self.head_weights)
 
         concat_out_dim = self.no_heads * (self.c_z + self.c_hidden + self.no_v_points * 4)
-        self.linear_out = Linear(concat_out_dim, self.c_s, init="final")
+        self.linear_out = Linear(concat_out_dim, self.c_s)
 
         self.softmax = nn.Softmax(dim=-1)
         self.softplus = nn.Softplus()
@@ -322,20 +317,23 @@ class InvariantPointAttention(nn.Module):
         # [*, H, N_res, N_res]
         pt_att = permute_final_dims(pt_att, (2, 0, 1))
 
-        if inplace_safe:
-            a += pt_att
-            del pt_att
-            a += square_mask.unsqueeze(-3)
-            # in-place softmax
-            attn_core_inplace_cuda.forward_(
-                a,
-                reduce(mul, a.shape[:-1]),
-                a.shape[-1],
-            )
-        else:
-            a = a + pt_att
-            a = a + square_mask.unsqueeze(-3)
-            a = self.softmax(a)
+        # if inplace_safe:
+        #     a += pt_att
+        #     del pt_att
+        #     a += square_mask.unsqueeze(-3)
+        #     # in-place softmax
+        #     attn_core_inplace_cuda.forward_(
+        #         a,
+        #         reduce(mul, a.shape[:-1]),
+        #         a.shape[-1],
+        #     )
+        # else:
+        #     a = a + pt_att
+        #     a = a + square_mask.unsqueeze(-3)
+        #     a = self.softmax(a)
+        a = a + pt_att
+        a = a + square_mask.unsqueeze(-3)
+        a = self.softmax(a)
 
         ################
         # Compute output
@@ -399,7 +397,7 @@ class BackboneUpdate(nn.Module):
 
         self.c_s = c_s
 
-        self.linear = Linear(self.c_s, 6, init="final")
+        self.linear = Linear(self.c_s, 6)
 
     def forward(self, s: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -420,9 +418,9 @@ class StructureModuleTransitionLayer(nn.Module):
 
         self.c = c
 
-        self.linear_1 = Linear(self.c, self.c, init="relu")
-        self.linear_2 = Linear(self.c, self.c, init="relu")
-        self.linear_3 = Linear(self.c, self.c, init="final")
+        self.linear_1 = Linear(self.c, self.c)
+        self.linear_2 = Linear(self.c, self.c)
+        self.linear_3 = Linear(self.c, self.c)
 
         self.relu = nn.ReLU()
 
@@ -682,6 +680,7 @@ class StructureModule(nn.Module):
                 "unnormalized_angles": unnormalized_angles,
                 "angles": angles,
                 "positions": pred_xyz,
+                "states": s,
             }
 
             outputs.append(preds)

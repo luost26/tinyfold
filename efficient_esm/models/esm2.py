@@ -49,6 +49,11 @@ class ESM2(nn.Module):
         cfg = model_data["cfg"]["model"]
         state_dict = model_data["model"]
         state_dict = upgrade_state_dict(state_dict)
+
+        contact_path = path.replace(".pt", "-contact-regression.pt")
+        contact_data = torch.load(contact_path, map_location="cpu", weights_only=False)
+        state_dict.update(contact_data["model"])
+
         model = ESM2(
             num_layers=cfg.encoder_layers,
             embed_dim=cfg.encoder_embed_dim,
@@ -56,6 +61,7 @@ class ESM2(nn.Module):
             alphabet="ESM-1b",
             token_dropout=cfg.token_dropout,
         )
+        model.load_state_dict(state_dict)
         return model
 
     def _init_submodules(self):

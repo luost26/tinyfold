@@ -83,6 +83,27 @@ class ESMFold(nn.Module):
             nn.Linear(cfg.lddt_head_hid_dim, 37 * self.lddt_bins),
         )
 
+    @classmethod
+    def load(cls, esmfold_path, esm_path) -> "ESMFold":
+        """Load a model from a file."""
+        esm = ESM2.load(esm_path)
+        esmfold_model_data = torch.load(esmfold_path, map_location="cpu", weights_only=False)
+        model = cls(esm, esm.alphabet, esmfold_config=esmfold_model_data["cfg"]["model"])
+
+        expected_keys = set(model.state_dict().keys())
+        found_keys = set(esmfold_model_data["model"].keys())
+
+        missing_essential_keys = []
+        for missing_key in expected_keys - found_keys:
+            if not missing_key.startswith("esm."):
+                missing_essential_keys.append(missing_key)
+
+        if missing_essential_keys:
+            raise RuntimeError(f"Keys '{', '.join(missing_essential_keys)}' are missing.")
+
+        model.load_state_dict(esmfold_model_data["model"], strict=False)
+        return model
+
     @staticmethod
     def _af2_to_esm(d: Alphabet):
         # Remember that t is shifted from residue_constants by 1 (0 is padding).
