@@ -78,8 +78,6 @@ class ESM2(nn.Module):
                     self.embed_dim,
                     4 * self.embed_dim,
                     self.attention_heads,
-                    add_bias_kv=False,
-                    use_esm1b_layer_norm=True,
                     use_rotary_embeddings=True,
                 )
                 for _ in range(self.num_layers)
