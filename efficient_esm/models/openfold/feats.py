@@ -1,8 +1,9 @@
+# mypy: ignore-errors
 import torch
 from torch import nn
 
-from .openfold_rigid_utils import Rigid, Rotation
-from .openfold_tensor_utils import batched_gather
+from .rigid_utils import Rigid, Rotation
+from .tensor_utils import batched_gather
 
 
 def atom14_to_atom37(atom14, batch):

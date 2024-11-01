@@ -12,10 +12,10 @@ from torch.nn import LayerNorm
 from efficient_esm.data.alphabet import Alphabet
 
 from .esm2 import ESM2
-from .folding import residue_constants
-from .folding.misc import batch_encode_sequences, collate_dense_tensors, output_to_pdb
-from .folding.openfold_data_transforms import make_atom14_masks
+from .esm_misc import batch_encode_sequences, collate_dense_tensors, output_to_pdb
 from .heads import categorical_lddt
+from .openfold import residue_constants
+from .openfold.data_transforms import make_atom14_masks
 from .trunk import FoldingTrunk, FoldingTrunkConfig
 
 

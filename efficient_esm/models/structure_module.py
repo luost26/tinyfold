@@ -1,17 +1,4 @@
-# Copyright 2021 AlQuraishi Laboratory
-# Copyright 2021 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# mypy: ignore-errors
 import importlib
 import math
 from collections.abc import Sequence
@@ -22,21 +9,21 @@ import torch
 import torch.nn as nn
 from torch.nn import LayerNorm, Linear
 
-from efficient_esm.models.folding.openfold_feats import (
+from efficient_esm.models.openfold.feats import (
     frames_and_literature_positions_to_atom14_pos,
     torsion_angles_to_frames,
 )
-from efficient_esm.models.folding.openfold_rigid_utils import Rigid, Rotation
-from efficient_esm.models.folding.openfold_tensor_utils import (
-    dict_multimap,
-    flatten_final_dims,
-    permute_final_dims,
-)
-from efficient_esm.models.folding.residue_constants import (
+from efficient_esm.models.openfold.residue_constants import (
     restype_atom14_mask,
     restype_atom14_rigid_group_positions,
     restype_atom14_to_rigid_group,
     restype_rigid_group_default_frame,
+)
+from efficient_esm.models.openfold.rigid_utils import Rigid, Rotation
+from efficient_esm.models.openfold.tensor_utils import (
+    dict_multimap,
+    flatten_final_dims,
+    permute_final_dims,
 )
 
 attn_core_inplace_cuda = importlib.import_module("attn_core_inplace_cuda")
