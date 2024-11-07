@@ -44,11 +44,16 @@ struct matrix
     {
         return &data[i * n_cols + j];
     }
+
+    const T* operator()(int i, int j) const
+    {
+        return &data[i * n_cols + j];
+    }
 };
 
 
 template <typename T>
-void matmul(matrix<T> &A, matrix<T> &B, matrix<T> &C)
+void matmul(const matrix<T> &A, const matrix<T> &B, matrix<T> &C)
 {
     for (int i = 0; i < A.n_rows; i++)
     {
@@ -66,7 +71,7 @@ void matmul(matrix<T> &A, matrix<T> &B, matrix<T> &C)
 
 
 template <typename T>
-void matmul_add(matrix<T> &A, matrix<T> &B, matrix<T> &bias, matrix<T> &C)
+void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, matrix<T> &C)
 {
     for (int i = 0; i < A.n_rows; i++)
     {
@@ -106,7 +111,7 @@ void softmax_(matrix<T> &A) {
 
 // Implement cout to print matrix
 template <typename T>
-std::ostream& operator<<(std::ostream &os, matrix<T> &A)
+std::ostream& operator<<(std::ostream &os, const matrix<T> &A)
 {
     for (int i = 0; i < A.n_rows; i++)
     {
