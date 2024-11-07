@@ -1,6 +1,7 @@
 # mypy: ignore-errors
 import math
 from collections.abc import Sequence
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -22,6 +23,7 @@ from efficient_esm.models.openfold.tensor_utils import (
     flatten_final_dims,
     permute_final_dims,
 )
+from efficient_esm.utils.export import export_tensor_dict, export_value_list
 
 
 class AngleResnetBlock(nn.Module):
@@ -204,6 +206,15 @@ class InvariantPointAttention(nn.Module):
 
         self.softmax = nn.Softmax(dim=-1)
         self.softplus = nn.Softplus()
+
+    def export(self, dirpath: str | Path) -> None:
+        dirpath = Path(dirpath)
+        torch.save(self.state_dict(), dirpath / "state_dict.pt")
+        export_tensor_dict(self.state_dict(), dirpath)
+        export_value_list(
+            [self.c_s, self.c_z, self.c_hidden, self.no_heads, self.no_qk_points, self.no_v_points],
+            dirpath / "config.txt",
+        )
 
     def forward(
         self,
