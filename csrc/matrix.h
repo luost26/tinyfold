@@ -1,6 +1,9 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
+#include <iostream>
+#include <string>
+
 template <typename T>
 struct matrix
 {
@@ -22,6 +25,14 @@ struct matrix
         {
             data[i] = A.data[i];
         }
+    }
+
+    matrix(const std::string & path, int n_rows, int n_cols) {
+        data = new T[n_rows * n_cols];
+        this->n_rows = n_rows;
+        this->n_cols = n_cols;
+        FILE *f = fopen(path.c_str(), "rb");
+        fread(data, sizeof(T), n_rows * n_cols, f);
     }
 
     ~matrix()
