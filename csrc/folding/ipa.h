@@ -62,6 +62,8 @@ struct IPAForwardBuffer {
 
     matrix<float> q_pts;
     matrix<float> kv_pts;
+    matrix<float> k_pts;
+    matrix<float> v_pts;
 
     matrix<float> a;
 
@@ -74,6 +76,8 @@ struct IPAForwardBuffer {
         v(seqlen, cfg.no_heads * cfg.c_hidden),
         q_pts(seqlen, cfg.no_heads * cfg.no_qk_points * 3),
         kv_pts(seqlen, cfg.no_heads * (cfg.no_qk_points + cfg.no_v_points) * 3),
+        k_pts(seqlen, cfg.no_heads * cfg.no_qk_points * 3),
+        v_pts(seqlen, cfg.no_heads * cfg.no_v_points * 3),
         a(cfg.no_heads * seqlen, seqlen)
     {}
 
@@ -108,6 +112,10 @@ struct InvariantPointAttention
     matrix<float> linear_q_points_bias;
     matrix<float> linear_kv_points_weight;
     matrix<float> linear_kv_points_bias;
+    matrix<float> linear_k_points_weight;
+    matrix<float> linear_k_points_bias;
+    matrix<float> linear_v_points_weight;
+    matrix<float> linear_v_points_bias;
 
     matrix<float> linear_b_weight;
     matrix<float> linear_b_bias;
@@ -129,6 +137,11 @@ struct InvariantPointAttention
         linear_q_points_bias(cfg.no_heads * cfg.no_qk_points * 3, 1),
         linear_kv_points_weight(cfg.no_heads * (cfg.no_qk_points + cfg.no_v_points) * 3, cfg.c_s),
         linear_kv_points_bias(cfg.no_heads * (cfg.no_qk_points + cfg.no_v_points) * 3, 1),
+        linear_k_points_weight(cfg.no_heads * cfg.no_qk_points * 3, cfg.c_s),
+        linear_k_points_bias(cfg.no_heads * cfg.no_qk_points * 3, 1),
+        linear_v_points_weight(cfg.no_heads * cfg.no_v_points * 3, cfg.c_s),
+        linear_v_points_bias(cfg.no_heads * cfg.no_v_points * 3, 1),
+
         linear_b_weight(cfg.no_heads, cfg.c_z),
         linear_b_bias(cfg.no_heads, 1),
         linear_out_weight(cfg.no_heads * (cfg.c_z + cfg.c_hidden + cfg.no_v_points) * 4, cfg.c_s),
@@ -145,9 +158,9 @@ struct InvariantPointAttention
                     for (int k = 0; k < cfg.c_s; k ++) {
                         *linear_k_weight(i * cfg.c_hidden + j, k) = *kv_w_raw(i * 2 * cfg.c_hidden + 0 * cfg.c_hidden + j, k);
                         *linear_v_weight(i * cfg.c_hidden + j, k) = *kv_w_raw(i * 2 * cfg.c_hidden + 1 * cfg.c_hidden + j, k);
-                        *linear_k_bias(i * cfg.c_hidden + j, 0) = *kv_b_raw(i * 2 * cfg.c_hidden + 0 * cfg.c_hidden + j, 0);
-                        *linear_v_bias(i * cfg.c_hidden + j, 0) = *kv_b_raw(i * 2 * cfg.c_hidden + 1 * cfg.c_hidden + j, 0);
                     } 
+                    *linear_k_bias(i * cfg.c_hidden + j, 0) = *kv_b_raw(i * 2 * cfg.c_hidden + 0 * cfg.c_hidden + j, 0);
+                    *linear_v_bias(i * cfg.c_hidden + j, 0) = *kv_b_raw(i * 2 * cfg.c_hidden + 1 * cfg.c_hidden + j, 0);
                 }
             }
         }
@@ -165,9 +178,41 @@ struct InvariantPointAttention
                     *linear_q_points_weight(i * 3 + 0, j) = *q_pts_w_raw(grpsize * 0 + i, j);
                     *linear_q_points_weight(i * 3 + 1, j) = *q_pts_w_raw(grpsize * 1 + i, j);
                     *linear_q_points_weight(i * 3 + 2, j) = *q_pts_w_raw(grpsize * 2 + i, j);
-                    *linear_q_points_bias(i * 3 + 0, 0) = *q_pts_b_raw(grpsize * 0 + i, 0);
-                    *linear_q_points_bias(i * 3 + 1, 0) = *q_pts_b_raw(grpsize * 1 + i, 0);
-                    *linear_q_points_bias(i * 3 + 2, 0) = *q_pts_b_raw(grpsize * 2 + i, 0);
+                }
+                *linear_q_points_bias(i * 3 + 0, 0) = *q_pts_b_raw(grpsize * 0 + i, 0);
+                *linear_q_points_bias(i * 3 + 1, 0) = *q_pts_b_raw(grpsize * 1 + i, 0);
+                *linear_q_points_bias(i * 3 + 2, 0) = *q_pts_b_raw(grpsize * 2 + i, 0);
+            }
+        }
+
+        /*
+           Original output channels layout: (3, no_heads, no_qk_points + no_v_points)
+           We rearrange it to (no_heads, no_qk_points, 3) and (no_heads, no_v_points, 3)
+         */
+        {
+            matrix<float> kv_pts_w(dirpath + "/linear_kv_points.weight.bin", cfg.no_heads * (cfg.no_qk_points + cfg.no_v_points) * 3, cfg.c_s);
+            matrix<float> kv_pts_b(dirpath + "/linear_kv_points.bias.bin", cfg.no_heads * (cfg.no_qk_points + cfg.no_v_points) * 3, 1);
+            int sum_kv_pts = cfg.no_qk_points + cfg.no_v_points;
+            for (int i = 0; i < cfg.no_heads; i ++) {
+                for (int j = 0; j < cfg.no_qk_points; j ++) {
+                    for (int k = 0; k < cfg.c_s; k ++) {
+                        *linear_k_points_weight(i * cfg.no_qk_points * 3 + j * 3 + 0, k) = *kv_pts_w(0 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + j, k);
+                        *linear_k_points_weight(i * cfg.no_qk_points * 3 + j * 3 + 1, k) = *kv_pts_w(1 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + j, k);
+                        *linear_k_points_weight(i * cfg.no_qk_points * 3 + j * 3 + 2, k) = *kv_pts_w(2 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + j, k);
+                    }
+                    *linear_k_points_bias(i * cfg.no_qk_points * 3 + j * 3 + 0, 0) = *kv_pts_b(0 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + j, 0);
+                    *linear_k_points_bias(i * cfg.no_qk_points * 3 + j * 3 + 1, 0) = *kv_pts_b(1 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + j, 0);
+                    *linear_k_points_bias(i * cfg.no_qk_points * 3 + j * 3 + 2, 0) = *kv_pts_b(2 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + j, 0);
+                }
+                for (int j = 0; j < cfg.no_v_points; j ++) {
+                    for (int k = 0; k < cfg.c_s; k ++) {
+                        *linear_v_points_weight(i * cfg.no_v_points * 3 + j * 3 + 0, k) = *kv_pts_w(0 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + cfg.no_qk_points + j, k);
+                        *linear_v_points_weight(i * cfg.no_v_points * 3 + j * 3 + 1, k) = *kv_pts_w(1 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + cfg.no_qk_points + j, k);
+                        *linear_v_points_weight(i * cfg.no_v_points * 3 + j * 3 + 2, k) = *kv_pts_w(2 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + cfg.no_qk_points + j, k);
+                    }
+                    *linear_v_points_bias(i * cfg.no_v_points * 3 + j * 3 + 0, 0) = *kv_pts_b(0 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + cfg.no_qk_points + j, 0);
+                    *linear_v_points_bias(i * cfg.no_v_points * 3 + j * 3 + 1, 0) = *kv_pts_b(1 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + cfg.no_qk_points + j, 0);
+                    *linear_v_points_bias(i * cfg.no_v_points * 3 + j * 3 + 2, 0) = *kv_pts_b(2 * cfg.no_heads * sum_kv_pts + i * sum_kv_pts + cfg.no_qk_points + j, 0);
                 }
             }
         }
@@ -190,10 +235,20 @@ struct InvariantPointAttention
         linear(s, linear_v_weight, linear_v_bias, buffer.v);
 
         // q_pts: (len, no_heads * no_qk_points * 3)
+        // k_pts: (len, no_heads * no_qk_points * 3)
         linear(s, linear_q_points_weight, linear_q_points_bias, buffer.q_pts);
+        linear(s, linear_k_points_weight, linear_k_points_bias, buffer.k_pts);
         for (int i = 0; i < buffer.seqlen; i++) {
             for (int j = 0; j < cfg.no_heads * cfg.no_qk_points; j++) {
                 apply_affine(r(i, 0), buffer.q_pts(i, j * 3), buffer.q_pts(i, j * 3));
+                apply_affine(r(i, 0), buffer.k_pts(i, j * 3), buffer.k_pts(i, j * 3));
+            }
+        }
+        
+        linear(s, linear_v_points_weight, linear_v_points_bias, buffer.v_pts);
+        for (int i = 0; i < buffer.seqlen; i++) {
+            for (int j = 0; j < cfg.no_heads * cfg.no_v_points; j++) {
+                apply_affine(r(i, 0), buffer.v_pts(i, j * 3), buffer.v_pts(i, j * 3));
             }
         }
     }
