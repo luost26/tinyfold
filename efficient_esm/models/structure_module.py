@@ -225,6 +225,7 @@ class InvariantPointAttention(nn.Module):
         inplace_safe: bool = False,
         _offload_inference: bool = False,
         _z_reference_list: Sequence[torch.Tensor] | None = None,
+        return_intermediates: bool = False,
     ) -> torch.Tensor:
         """
         Args:
@@ -390,7 +391,14 @@ class InvariantPointAttention(nn.Module):
             torch.cat((o, *torch.unbind(o_pt, dim=-1), o_pt_norm, o_pair), dim=-1).to(dtype=z[0].dtype)
         )
 
-        return s
+        if return_intermediates:
+            return s, {
+                "s": s,
+                "q": q, "k": k, "v": v, "kv": kv,
+                "q_pts": q_pts, "k_pts": k_pts, "v_pts": v_pts, "kv_pts": kv_pts,
+            }
+        else:
+            return s
 
 
 class BackboneUpdate(nn.Module):
