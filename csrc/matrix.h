@@ -40,12 +40,12 @@ struct matrix
         delete[] data;
     }
 
-    T* operator()(int i, int j)
+    inline T* operator()(int i, int j)
     {
         return &data[i * n_cols + j];
     }
 
-    const T* operator()(int i, int j) const
+    inline const T* operator()(int i, int j) const
     {
         return &data[i * n_cols + j];
     }
@@ -55,6 +55,24 @@ struct matrix
 template <bool transposed_B = false, typename T>
 void matmul(const matrix<T> &A, const matrix<T> &B, matrix<T> &C)
 {
+    int I, J, K1, K2;
+    if (transposed_B) {
+        I = A.n_rows;
+        J = B.n_rows;
+        K1 = A.n_cols;
+        K2 = B.n_cols;
+    } else {
+        I = A.n_rows;
+        J = B.n_cols;
+        K1 = A.n_cols;
+        K2 = B.n_rows;
+    }
+    if (C.n_rows != I || C.n_cols != J || K1 != K2)
+    {
+        std::cerr << "Matrix dimensions do not match" << std::endl;
+        exit(1);
+    }
+
     for (int i = 0; i < C.n_rows; i++)
     {
         for (int j = 0; j < C.n_cols; j++)
@@ -77,6 +95,34 @@ void matmul(const matrix<T> &A, const matrix<T> &B, matrix<T> &C)
 template <bool transposed_B = false, bool is_bias_vector = false, typename T>
 void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, matrix<T> &C)
 {
+    int I, J, K1, K2;
+    if (transposed_B) {
+        I = A.n_rows;
+        J = B.n_rows;
+        K1 = A.n_cols;
+        K2 = B.n_cols;
+    } else {
+        I = A.n_rows;
+        J = B.n_cols;
+        K1 = A.n_cols;
+        K2 = B.n_rows;
+    }
+    if (C.n_rows != I || C.n_cols != J || K1 != K2)
+    {
+        std::cerr << "Matrix dimensions do not match" << std::endl;
+        exit(1);
+    }
+    if (is_bias_vector) {
+        if (bias.n_cols != 1) {
+            std::cerr << "Bias vector must have 1 column" << std::endl;
+            exit(1);
+        }
+        if (bias.n_rows != C.n_cols) {
+            std::cerr << "Bias vector must have the same number of rows as the output matrix's number of cols" << std::endl;
+            exit(1);
+        }
+    }
+
     for (int i = 0; i < C.n_rows; i++)
     {
         for (int j = 0; j < C.n_cols; j++)
@@ -127,12 +173,42 @@ void softmax_(matrix<T> &A) {
 
 
 template <typename T>
-void fill_(matrix<T> & A, T val) {
+inline void fill_(matrix<T> & A, T val) {
     for (int i = 0; i < A.n_rows; i++) {
         for (int j = 0; j < A.n_cols; j++) {
             *A(i, j) = val;
         }
     }
+}
+
+
+template <typename T>
+inline void sub_(matrix<T> &A, const matrix<T> &B) {
+    for (int i = 0; i < A.n_rows; i++) {
+        for (int j = 0; j < A.n_cols; j++) {
+            *A(i, j) -= *B(i, j);
+        }
+    }
+}
+
+
+template <typename T>
+inline bool allclose(const matrix<T> &A, const matrix<T> &B, T atol = 1e-6, T * error_output = nullptr) {
+    if (A.n_rows != B.n_rows || A.n_cols != B.n_cols) {
+        return false;
+    }
+    for (int i = 0; i < A.n_rows; i++) {
+        for (int j = 0; j < A.n_cols; j++) {
+            T error = std::abs(*A(i, j) - *B(i, j));
+            if (error > atol) {
+                if (error_output) {
+                    *error_output = error;
+                }
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 
