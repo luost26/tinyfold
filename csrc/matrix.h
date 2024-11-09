@@ -183,6 +183,12 @@ inline void fill_(matrix<T> & A, T val) {
 
 
 template <typename T>
+inline void zero_(matrix<T> & A) {
+    memset(A.data, 0, A.n_rows * A.n_cols * sizeof(T));
+}
+
+
+template <typename T>
 inline void sub_(matrix<T> &A, const matrix<T> &B) {
     for (int i = 0; i < A.n_rows; i++) {
         for (int j = 0; j < A.n_cols; j++) {

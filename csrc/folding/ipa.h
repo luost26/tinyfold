@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <cmath>
 #include "../matrix.h"
 #include "linear.h"
 
@@ -17,6 +18,50 @@ inline void apply_affine(const float * affine_4x4, const float * vec3, float * o
     out3[0] = x;
     out3[1] = y;
     out3[2] = z;
+}
+
+
+inline void qk_inner_product_accumulate(const matrix<float> &query, const matrix<float> &key, float scale_factor, matrix<float> &out) {
+    // q: (n_q, no_heads * c_hidden)
+    // k: (n_k, no_heads * c_hidden)
+    // out: (no_heads * n_q, n_k)
+    int n_q = query.n_rows;
+    int n_k = key.n_rows;
+    int no_heads = out.n_rows / n_q;
+    int c_hidden = query.n_cols / no_heads;
+    for (int h = 0; h < no_heads; h++) {
+        for (int i = 0; i < n_q; i++) {
+            for (int j = 0; j < n_k; j++) {
+                float sum = 0;
+                for (int k = 0; k < c_hidden; k++) {
+                    sum += *query(i, h * c_hidden + k) * *key(j, h * c_hidden + k);
+                }
+                *out(h * n_q + i, j) += sum * scale_factor;
+            }
+        }
+    }
+}
+
+
+inline void pair_bias_linear_accumulate(const matrix<float> z, const matrix<float> &weight, const matrix<float> &bias, float scale_factor, matrix<float> &out) {
+    // z: (len*len, c_z)
+    // weight: (no_heads, c_z)
+    // bias: (no_heads, 1)
+    // out: (no_heads * len, len)
+    int len = out.n_cols;
+    int no_heads = weight.n_rows;
+    int c_z = weight.n_cols;
+    for (int h = 0; h < no_heads; h ++) {
+        for (int i = 0; i < len; i ++) {
+            for (int j = 0; j < len; j ++) {
+                float sum = 0;
+                for (int k = 0; k < c_z; k ++) {
+                    sum += *z(i * len + j, k) * *weight(h, k);
+                }
+                *out(h * len + i, j) += (sum + *bias(h, 0)) * scale_factor;
+            }
+        }
+    }
 }
 
 
@@ -56,14 +101,14 @@ struct IPAForwardBuffer {
     IPAConfig cfg;
 
     matrix<float> q;
-    matrix<float> kv;
     matrix<float> k;
     matrix<float> v;
 
     matrix<float> q_pts;
-    matrix<float> kv_pts;
     matrix<float> k_pts;
     matrix<float> v_pts;
+
+    matrix<float> b;
 
     matrix<float> a;
 
@@ -71,26 +116,17 @@ struct IPAForwardBuffer {
         seqlen(seqlen),
         cfg(cfg),
         q(seqlen, cfg.no_heads * cfg.c_hidden),
-        kv(seqlen, cfg.no_heads * 2 * cfg.c_hidden),
         k(seqlen, cfg.no_heads * cfg.c_hidden),
         v(seqlen, cfg.no_heads * cfg.c_hidden),
         q_pts(seqlen, cfg.no_heads * cfg.no_qk_points * 3),
-        kv_pts(seqlen, cfg.no_heads * (cfg.no_qk_points + cfg.no_v_points) * 3),
         k_pts(seqlen, cfg.no_heads * cfg.no_qk_points * 3),
         v_pts(seqlen, cfg.no_heads * cfg.no_v_points * 3),
+        b(seqlen * seqlen, cfg.no_heads),
         a(cfg.no_heads * seqlen, seqlen)
     {}
 
     inline float * q_loc(int i, int h, int d) {
         return q.data + i * (cfg.no_heads * cfg.c_hidden) + h * cfg.c_hidden + d;
-    }
-
-    inline float * k_loc(int i, int h, int d) {
-        return kv.data + i * (cfg.no_heads * 2 * cfg.c_hidden) + h * 2 * cfg.c_hidden + 0 * cfg.c_hidden + d;
-    }
-
-    inline float * v_loc(int i, int h, int d) {
-        return kv.data + i * (cfg.no_heads * 2 * cfg.c_hidden) + h * 2 * cfg.c_hidden + 1 * cfg.c_hidden + d;
     }
 
 };
@@ -244,13 +280,16 @@ struct InvariantPointAttention
                 apply_affine(r(i, 0), buffer.k_pts(i, j * 3), buffer.k_pts(i, j * 3));
             }
         }
-        
         linear(s, linear_v_points_weight, linear_v_points_bias, buffer.v_pts);
         for (int i = 0; i < buffer.seqlen; i++) {
             for (int j = 0; j < cfg.no_heads * cfg.no_v_points; j++) {
                 apply_affine(r(i, 0), buffer.v_pts(i, j * 3), buffer.v_pts(i, j * 3));
             }
         }
+
+        zero_(buffer.a);
+        qk_inner_product_accumulate(buffer.q, buffer.k, 1.0f / sqrtf(3.0f * cfg.c_hidden), buffer.a);
+        linear(z, linear_b_weight, linear_b_bias, buffer.b);
     }
 };
 
