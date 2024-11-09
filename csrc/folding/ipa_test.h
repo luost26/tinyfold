@@ -9,6 +9,8 @@
     float error; \
     if (!allclose(A, B, ATOL, &error)) { \
         std::cout << "Test " << NAME << ": FAIL, error = " << error << std::endl; \
+        std::cout << "Expected:\n" << B << std::endl; \
+        std::cout << "Got:\n" << A << std::endl; \
     } else { \
         std::cout << "Test " << NAME << ": PASS" << std::endl; \
     } \
@@ -36,7 +38,9 @@ void test_ipa() {
     }
 
     TEST_INTERMEDIATE_ALLCLOSE(q, 1e-6f);
-    TEST_INTERMEDIATE_ALLCLOSE(kv, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(k, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(v, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(q_pts, 1e-6f);
 }
 
 #endif // FOLDING_IPA_TEST_H

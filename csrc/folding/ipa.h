@@ -10,6 +10,16 @@ const float INF = 1e5f;
 const float EPS = 1e-8f;
 
 
+inline void apply_affine(const float * affine_4x4, const float * vec3, float * out3) {
+    float x = affine_4x4[0] * vec3[0] + affine_4x4[1] * vec3[1] + affine_4x4[2] * vec3[2] + affine_4x4[3];
+    float y = affine_4x4[4] * vec3[0] + affine_4x4[5] * vec3[1] + affine_4x4[6] * vec3[2] + affine_4x4[7];
+    float z = affine_4x4[8] * vec3[0] + affine_4x4[9] * vec3[1] + affine_4x4[10] * vec3[2] + affine_4x4[11];
+    out3[0] = x;
+    out3[1] = y;
+    out3[2] = z;
+}
+
+
 struct IPAConfig {
     int c_s;
     int c_z;
@@ -47,6 +57,8 @@ struct IPAForwardBuffer {
 
     matrix<float> q;
     matrix<float> kv;
+    matrix<float> k;
+    matrix<float> v;
 
     matrix<float> q_pts;
     matrix<float> kv_pts;
@@ -58,6 +70,8 @@ struct IPAForwardBuffer {
         cfg(cfg),
         q(seqlen, cfg.no_heads * cfg.c_hidden),
         kv(seqlen, cfg.no_heads * 2 * cfg.c_hidden),
+        k(seqlen, cfg.no_heads * cfg.c_hidden),
+        v(seqlen, cfg.no_heads * cfg.c_hidden),
         q_pts(seqlen, cfg.no_heads * cfg.no_qk_points * 3),
         kv_pts(seqlen, cfg.no_heads * (cfg.no_qk_points + cfg.no_v_points) * 3),
         a(cfg.no_heads * seqlen, seqlen)
@@ -85,8 +99,10 @@ struct InvariantPointAttention
 
     matrix<float> linear_q_weight;
     matrix<float> linear_q_bias;
-    matrix<float> linear_kv_weight;
-    matrix<float> linear_kv_bias;
+    matrix<float> linear_k_weight;
+    matrix<float> linear_k_bias;
+    matrix<float> linear_v_weight;
+    matrix<float> linear_v_bias;
 
     matrix<float> linear_q_points_weight;
     matrix<float> linear_q_points_bias;
@@ -104,8 +120,11 @@ struct InvariantPointAttention
         head_weights(cfg.no_heads, 1),
         linear_q_weight(cfg.c_hidden * cfg.no_heads, cfg.c_s),
         linear_q_bias(cfg.c_hidden * cfg.no_heads, 1),
-        linear_kv_weight(2 * cfg.c_hidden * cfg.no_heads, cfg.c_s),
-        linear_kv_bias(2 * cfg.c_hidden * cfg.no_heads, 1),
+        linear_k_weight(cfg.c_hidden * cfg.no_heads, cfg.c_s),
+        linear_k_bias(cfg.c_hidden * cfg.no_heads, 1),
+        linear_v_weight(cfg.c_hidden * cfg.no_heads, cfg.c_s),
+        linear_v_bias(cfg.c_hidden * cfg.no_heads, 1),
+
         linear_q_points_weight(cfg.no_heads * cfg.no_qk_points * 3, cfg.c_s),
         linear_q_points_bias(cfg.no_heads * cfg.no_qk_points * 3, 1),
         linear_kv_points_weight(cfg.no_heads * (cfg.no_qk_points + cfg.no_v_points) * 3, cfg.c_s),
@@ -118,12 +137,43 @@ struct InvariantPointAttention
         load_(head_weights, dirpath + "/head_weights.bin");
         load_(linear_q_weight, dirpath + "/linear_q.weight.bin");
         load_(linear_q_bias, dirpath + "/linear_q.bias.bin");
-        load_(linear_kv_weight, dirpath + "/linear_kv.weight.bin");
-        load_(linear_kv_bias, dirpath + "/linear_kv.bias.bin");
-        load_(linear_q_points_weight, dirpath + "/linear_q_points.weight.bin");
-        load_(linear_q_points_bias, dirpath + "/linear_q_points.bias.bin");
+        {
+            matrix<float> kv_w_raw(dirpath + "/linear_kv.weight.bin", 2 * cfg.c_hidden * cfg.no_heads, cfg.c_s);
+            matrix<float> kv_b_raw(dirpath + "/linear_kv.bias.bin", 2 * cfg.c_hidden * cfg.no_heads, 1);
+            for (int i = 0; i < cfg.no_heads; i ++) {
+                for (int j = 0; j < cfg.c_hidden; j ++) {
+                    for (int k = 0; k < cfg.c_s; k ++) {
+                        *linear_k_weight(i * cfg.c_hidden + j, k) = *kv_w_raw(i * 2 * cfg.c_hidden + 0 * cfg.c_hidden + j, k);
+                        *linear_v_weight(i * cfg.c_hidden + j, k) = *kv_w_raw(i * 2 * cfg.c_hidden + 1 * cfg.c_hidden + j, k);
+                        *linear_k_bias(i * cfg.c_hidden + j, 0) = *kv_b_raw(i * 2 * cfg.c_hidden + 0 * cfg.c_hidden + j, 0);
+                        *linear_v_bias(i * cfg.c_hidden + j, 0) = *kv_b_raw(i * 2 * cfg.c_hidden + 1 * cfg.c_hidden + j, 0);
+                    } 
+                }
+            }
+        }
+
+        /* 
+          The output channel layout of the original weight and bias is (3, no_heads, no_qk_points).
+          We rearrange it to (no_heads, no_qk_points, 3).
+         */
+        {
+            matrix<float> q_pts_w_raw(dirpath + "/linear_q_points.weight.bin", linear_q_points_weight.n_rows, linear_q_points_weight.n_cols);
+            matrix<float> q_pts_b_raw(dirpath + "/linear_q_points.bias.bin", linear_q_points_bias.n_rows, linear_q_points_bias.n_cols);
+            int grpsize = linear_q_points_weight.n_rows / 3;
+            for (int i = 0; i < grpsize; i ++) {
+                for (int j = 0; j < linear_q_points_weight.n_cols; j ++) {
+                    *linear_q_points_weight(i * 3 + 0, j) = *q_pts_w_raw(grpsize * 0 + i, j);
+                    *linear_q_points_weight(i * 3 + 1, j) = *q_pts_w_raw(grpsize * 1 + i, j);
+                    *linear_q_points_weight(i * 3 + 2, j) = *q_pts_w_raw(grpsize * 2 + i, j);
+                    *linear_q_points_bias(i * 3 + 0, 0) = *q_pts_b_raw(grpsize * 0 + i, 0);
+                    *linear_q_points_bias(i * 3 + 1, 0) = *q_pts_b_raw(grpsize * 1 + i, 0);
+                    *linear_q_points_bias(i * 3 + 2, 0) = *q_pts_b_raw(grpsize * 2 + i, 0);
+                }
+            }
+        }
         load_(linear_kv_points_weight, dirpath + "/linear_kv_points.weight.bin");
         load_(linear_kv_points_bias, dirpath + "/linear_kv_points.bias.bin");
+
         load_(linear_b_weight, dirpath + "/linear_b.weight.bin");
         load_(linear_b_bias, dirpath + "/linear_b.bias.bin");
         load_(linear_out_weight, dirpath + "/linear_out.weight.bin");
@@ -136,7 +186,16 @@ struct InvariantPointAttention
         // z: (len*len, z_dim)
         // r: (len, 4*4)
         linear(s, linear_q_weight, linear_q_bias, buffer.q);
-        linear(s, linear_kv_weight, linear_kv_bias, buffer.kv);
+        linear(s, linear_k_weight, linear_k_bias, buffer.k);
+        linear(s, linear_v_weight, linear_v_bias, buffer.v);
+
+        // q_pts: (len, no_heads * no_qk_points * 3)
+        linear(s, linear_q_points_weight, linear_q_points_bias, buffer.q_pts);
+        for (int i = 0; i < buffer.seqlen; i++) {
+            for (int j = 0; j < cfg.no_heads * cfg.no_qk_points; j++) {
+                apply_affine(r(i, 0), buffer.q_pts(i, j * 3), buffer.q_pts(i, j * 3));
+            }
+        }
     }
 };
 
@@ -153,8 +212,10 @@ std::ostream& operator<<(std::ostream &os, const InvariantPointAttention &A)
     SHOW_MATRIX_SIZE(head_weights);
     SHOW_MATRIX_SIZE(linear_q_weight);
     SHOW_MATRIX_SIZE(linear_q_bias);
-    SHOW_MATRIX_SIZE(linear_kv_weight);
-    SHOW_MATRIX_SIZE(linear_kv_bias);
+    SHOW_MATRIX_SIZE(linear_k_weight);
+    SHOW_MATRIX_SIZE(linear_k_bias);
+    SHOW_MATRIX_SIZE(linear_v_weight);
+    SHOW_MATRIX_SIZE(linear_v_bias);
     SHOW_MATRIX_SIZE(linear_q_points_weight);
     SHOW_MATRIX_SIZE(linear_q_points_bias);
     SHOW_MATRIX_SIZE(linear_kv_points_weight);
