@@ -111,7 +111,11 @@ void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, m
     }
     if (C.n_rows != I || C.n_cols != J || K1 != K2)
     {
-        std::cerr << "Matrix dimensions do not match" << std::endl;
+        std::cerr << "Matrix dimensions do not match: ";
+        std::cerr << "A(" << A.n_rows << ", " << A.n_cols << ") ";
+        std::cerr << "B(" << B.n_rows << ", " << B.n_cols << ") ";
+        std::cerr << "bias(" << bias.n_rows << ", " << bias.n_cols << ") ";
+        std::cerr << "out(" << C.n_rows << ", " << C.n_cols << ") " << std::endl;
         exit(1);
     }
     if (is_bias_vector) {

@@ -287,8 +287,8 @@ struct InvariantPointAttention
 
         linear_b_weight(cfg.no_heads, cfg.c_z),
         linear_b_bias(cfg.no_heads, 1),
-        linear_out_weight(cfg.no_heads * (cfg.c_z + cfg.c_hidden + cfg.no_v_points * 4), cfg.c_s),
-        linear_out_bias(cfg.no_heads * (cfg.c_z + cfg.c_hidden + cfg.no_v_points * 4), 1)
+        linear_out_weight(cfg.c_s, cfg.no_heads * (cfg.c_z + cfg.c_hidden + cfg.no_v_points * 4)),
+        linear_out_bias(cfg.c_s, 1)
     {
         std::cerr << "Loading weights for InvariantPointAttention from " << dirpath << std::endl;
         load_(head_weights, dirpath + "/head_weights.bin");
@@ -404,6 +404,8 @@ struct InvariantPointAttention
         compute_output(buffer.a, buffer.v, buffer.o, 0);
         compute_output_pts(buffer.a, buffer.v_pts, r, buffer.o, cfg.no_heads * cfg.c_hidden);
         compute_output_pair(buffer.a, z, buffer.o, cfg.no_heads * cfg.c_hidden + cfg.no_heads * cfg.no_v_points * 4);
+
+        linear(buffer.o, linear_out_weight, linear_out_bias, out);
     }
 };
 
