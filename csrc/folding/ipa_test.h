@@ -29,7 +29,7 @@ void test_ipa() {
     matrix<float> r = matrix<float>(dirpath + "/input/r.bin", seqlen, 4*4);
     IPAForwardBuffer buffer(seqlen, ipa.cfg);
 
-    ipa(s, z, r, s, buffer);
+    ipa(s, z, r, s, buffer, false);
 
 
     #define TEST_INTERMEDIATE_ALLCLOSE(NAME,ATOL) { \

@@ -54,7 +54,7 @@ struct matrix
 };
 
 
-template <bool transposed_B = false, typename T>
+template <bool transposed_B = false, bool residual = false, typename T>
 void matmul(const matrix<T> &A, const matrix<T> &B, matrix<T> &C)
 {
     int I, J, K1, K2;
@@ -88,13 +88,17 @@ void matmul(const matrix<T> &A, const matrix<T> &B, matrix<T> &C)
                     sum += *A(i, k) * *B(k, j);
                 }
             }
-            *C(i, j) = sum;
+            if (residual) {
+                *C(i, j) += sum;
+            } else {
+                *C(i, j) = sum;
+            }
         }
     }
 }
 
 
-template <bool transposed_B = false, bool is_bias_vector = false, typename T>
+template <bool transposed_B = false, bool is_bias_vector = false, bool residual = false, typename T>
 void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, matrix<T> &C)
 {
     int I, J, K1, K2;
@@ -151,7 +155,11 @@ void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, m
                     sum += *A(i, k) * *B(k, j);
                 }
             }
-            *C(i, j) = sum;
+            if (residual) {
+                *C(i, j) += sum;
+            } else {
+                *C(i, j) = sum;
+            }
         }
     }
 }

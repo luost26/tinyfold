@@ -369,7 +369,7 @@ struct InvariantPointAttention
         std::cerr << "InvariantPointAttention weights loaded." << std::endl;
     }
 
-    void operator()(const matrix<float> &s, const matrix<float> &z, const matrix<float> &r, matrix<float> &out, IPAForwardBuffer &buffer)
+    void operator()(const matrix<float> &s, const matrix<float> &z, const matrix<float> &r, matrix<float> &out, IPAForwardBuffer &buffer, bool residual)
     {
         // s: (len, s_dim)
         // z: (len*len, z_dim)
@@ -405,7 +405,11 @@ struct InvariantPointAttention
         compute_output_pts(buffer.a, buffer.v_pts, r, buffer.o, cfg.no_heads * cfg.c_hidden);
         compute_output_pair(buffer.a, z, buffer.o, cfg.no_heads * cfg.c_hidden + cfg.no_heads * cfg.no_v_points * 4);
 
-        linear(buffer.o, linear_out_weight, linear_out_bias, out);
+        if (residual) {
+            linear_residual(buffer.o, linear_out_weight, linear_out_bias, out);
+        } else {
+            linear(buffer.o, linear_out_weight, linear_out_bias, out);
+        }
     }
 };
 
