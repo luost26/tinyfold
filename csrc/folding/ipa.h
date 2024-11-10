@@ -10,7 +10,6 @@
 const float INF = 1e5f;
 const float EPS = 1e-8f;
 
-
 inline void apply_affine(const float * affine_4x4, const float * vec3, float * out3) {
     float x = affine_4x4[0] * vec3[0] + affine_4x4[1] * vec3[1] + affine_4x4[2] * vec3[2] + affine_4x4[3];
     float y = affine_4x4[4] * vec3[0] + affine_4x4[5] * vec3[1] + affine_4x4[6] * vec3[2] + affine_4x4[7];
@@ -64,6 +63,38 @@ inline void pair_bias_linear_accumulate(const matrix<float> z, const matrix<floa
     }
 }
 
+inline float softplus(float x) {
+    return log1p(exp(x));
+}
+
+inline void qk_pnts_accumulate(const matrix<float> &q_pts, const matrix<float> &k_pts, const matrix<float> &head_weights, matrix<float> &out) {
+    // q_pts: (q_len, no_heads * no_qk_points * 3)
+    // k_pts: (k_len, no_heads * no_qk_points * 3)
+    // head_weights: (no_heads, 1)
+    // out: (no_heads * q_len, k_len)
+    int q_len = q_pts.n_rows;
+    int k_len = k_pts.n_rows;
+    int no_heads = head_weights.n_rows;
+    int no_qk_points = q_pts.n_cols / (3 * no_heads);
+    for (int h = 0; h < no_heads; h ++) {
+        float hw = softplus(*head_weights(h, 0)) * sqrtf(1.0f / (3.0f * (no_qk_points * 9.0f / 2.0f)));
+        for (int i = 0; i < q_len; i ++) {
+            for (int j = 0; j < k_len; j ++) {
+                float sum = 0.0f;
+                for (int p = 0; p < no_qk_points; p ++) {
+                    float d_x = *q_pts(i, h * no_qk_points * 3 + p * 3 + 0) - *k_pts(j, h * no_qk_points * 3 + p * 3 + 0);
+                    float d_y = *q_pts(i, h * no_qk_points * 3 + p * 3 + 1) - *k_pts(j, h * no_qk_points * 3 + p * 3 + 1);
+                    float d_z = *q_pts(i, h * no_qk_points * 3 + p * 3 + 2) - *k_pts(j, h * no_qk_points * 3 + p * 3 + 2);
+                    sum += d_x * d_x + d_y * d_y + d_z * d_z;
+                }
+                sum *= hw * (-0.5f);
+                *out(h * q_len + i, j) += sum;
+            }
+        }
+    }
+
+}
+
 
 struct IPAConfig {
     int c_s;
@@ -108,8 +139,6 @@ struct IPAForwardBuffer {
     matrix<float> k_pts;
     matrix<float> v_pts;
 
-    matrix<float> b;
-
     matrix<float> a;
 
     IPAForwardBuffer(int seqlen, const IPAConfig &cfg):
@@ -121,7 +150,6 @@ struct IPAForwardBuffer {
         q_pts(seqlen, cfg.no_heads * cfg.no_qk_points * 3),
         k_pts(seqlen, cfg.no_heads * cfg.no_qk_points * 3),
         v_pts(seqlen, cfg.no_heads * cfg.no_v_points * 3),
-        b(seqlen * seqlen, cfg.no_heads),
         a(cfg.no_heads * seqlen, seqlen)
     {}
 
@@ -146,8 +174,6 @@ struct InvariantPointAttention
 
     matrix<float> linear_q_points_weight;
     matrix<float> linear_q_points_bias;
-    matrix<float> linear_kv_points_weight;
-    matrix<float> linear_kv_points_bias;
     matrix<float> linear_k_points_weight;
     matrix<float> linear_k_points_bias;
     matrix<float> linear_v_points_weight;
@@ -171,8 +197,6 @@ struct InvariantPointAttention
 
         linear_q_points_weight(cfg.no_heads * cfg.no_qk_points * 3, cfg.c_s),
         linear_q_points_bias(cfg.no_heads * cfg.no_qk_points * 3, 1),
-        linear_kv_points_weight(cfg.no_heads * (cfg.no_qk_points + cfg.no_v_points) * 3, cfg.c_s),
-        linear_kv_points_bias(cfg.no_heads * (cfg.no_qk_points + cfg.no_v_points) * 3, 1),
         linear_k_points_weight(cfg.no_heads * cfg.no_qk_points * 3, cfg.c_s),
         linear_k_points_bias(cfg.no_heads * cfg.no_qk_points * 3, 1),
         linear_v_points_weight(cfg.no_heads * cfg.no_v_points * 3, cfg.c_s),
@@ -252,8 +276,6 @@ struct InvariantPointAttention
                 }
             }
         }
-        load_(linear_kv_points_weight, dirpath + "/linear_kv_points.weight.bin");
-        load_(linear_kv_points_bias, dirpath + "/linear_kv_points.bias.bin");
 
         load_(linear_b_weight, dirpath + "/linear_b.weight.bin");
         load_(linear_b_bias, dirpath + "/linear_b.bias.bin");
@@ -289,7 +311,9 @@ struct InvariantPointAttention
 
         zero_(buffer.a);
         qk_inner_product_accumulate(buffer.q, buffer.k, 1.0f / sqrtf(3.0f * cfg.c_hidden), buffer.a);
-        linear(z, linear_b_weight, linear_b_bias, buffer.b);
+        pair_bias_linear_accumulate(z, linear_b_weight, linear_b_bias, sqrtf(1.0f / 3.0f), buffer.a);
+        qk_pnts_accumulate(buffer.q_pts, buffer.k_pts, head_weights, buffer.a);
+        softmax_(buffer.a);
     }
 };
 
@@ -312,8 +336,6 @@ std::ostream& operator<<(std::ostream &os, const InvariantPointAttention &A)
     SHOW_MATRIX_SIZE(linear_v_bias);
     SHOW_MATRIX_SIZE(linear_q_points_weight);
     SHOW_MATRIX_SIZE(linear_q_points_bias);
-    SHOW_MATRIX_SIZE(linear_kv_points_weight);
-    SHOW_MATRIX_SIZE(linear_kv_points_bias);
     SHOW_MATRIX_SIZE(linear_b_weight);
     SHOW_MATRIX_SIZE(linear_b_bias);
     SHOW_MATRIX_SIZE(linear_out_weight);

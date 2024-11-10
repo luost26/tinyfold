@@ -394,8 +394,16 @@ class InvariantPointAttention(nn.Module):
         if return_intermediates:
             return s, {
                 "s": s,
-                "q": q, "k": k, "v": v, "kv": kv,
-                "q_pts": q_pts, "k_pts": k_pts, "v_pts": v_pts, "kv_pts": kv_pts,
+                "q": q,
+                "k": k,
+                "v": v,
+                "kv": kv,
+                "q_pts": q_pts,
+                "k_pts": k_pts,
+                "v_pts": v_pts,
+                "kv_pts": kv_pts,
+                "b": b,
+                "a": a,
             }
         else:
             return s
