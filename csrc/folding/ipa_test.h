@@ -44,6 +44,7 @@ void test_ipa() {
     TEST_INTERMEDIATE_ALLCLOSE(k_pts, 1e-6f);
     TEST_INTERMEDIATE_ALLCLOSE(v_pts, 1e-6f);
     TEST_INTERMEDIATE_ALLCLOSE(a, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(o, 1e-6f);
 }
 
 #endif // FOLDING_IPA_TEST_H

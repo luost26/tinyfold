@@ -20,6 +20,16 @@ inline void apply_affine(const float * affine_4x4, const float * vec3, float * o
 }
 
 
+inline void invert_apply_affine(const float * affine_4x4, const float * vec3, float * out3) {
+    float x = vec3[0] - affine_4x4[3];
+    float y = vec3[1] - affine_4x4[7];
+    float z = vec3[2] - affine_4x4[11];
+    out3[0] = affine_4x4[0] * x + affine_4x4[4] * y + affine_4x4[8] * z;
+    out3[1] = affine_4x4[1] * x + affine_4x4[5] * y + affine_4x4[9] * z;
+    out3[2] = affine_4x4[2] * x + affine_4x4[6] * y + affine_4x4[10] * z;
+}
+
+
 inline void qk_inner_product_accumulate(const matrix<float> &query, const matrix<float> &key, float scale_factor, matrix<float> &out) {
     // q: (n_q, no_heads * c_hidden)
     // k: (n_k, no_heads * c_hidden)
@@ -42,7 +52,7 @@ inline void qk_inner_product_accumulate(const matrix<float> &query, const matrix
 }
 
 
-inline void pair_bias_linear_accumulate(const matrix<float> z, const matrix<float> &weight, const matrix<float> &bias, float scale_factor, matrix<float> &out) {
+inline void pair_bias_linear_accumulate(const matrix<float> &z, const matrix<float> &weight, const matrix<float> &bias, float scale_factor, matrix<float> &out) {
     // z: (len*len, c_z)
     // weight: (no_heads, c_z)
     // bias: (no_heads, 1)
@@ -92,9 +102,80 @@ inline void qk_pnts_accumulate(const matrix<float> &q_pts, const matrix<float> &
             }
         }
     }
-
 }
 
+inline void compute_output(const matrix<float> &a, const matrix<float> &v, matrix<float> &out, int col_offset = 0) {
+    // a: (no_heads * q_len, v_len)
+    // v: (v_len, no_heads * c_hidden)
+    // out: (q_len, [col_offset +] no_heads * c_hidden)
+    int q_len = out.n_rows;
+    int v_len = v.n_rows;
+    int no_heads = a.n_rows / q_len;
+    int c_hidden = v.n_cols / no_heads;
+    for (int i = 0; i < q_len; i ++) {
+        for (int h = 0; h < no_heads; h ++) {
+            for (int k = 0; k < c_hidden; k ++) {
+                float sum = 0.0f;
+                for (int j = 0; j < v_len; j ++) {
+                    sum += *a(h * q_len + i, j) * *v(j, h * c_hidden + k);
+                }
+                *out(i, col_offset + h * c_hidden + k) = sum;
+            }
+        }
+    }
+}
+
+inline void compute_output_pts(const matrix<float> &a, const matrix<float> &v_pts, const matrix<float> &r, matrix<float> &out, int col_offset) {
+    // a: (no_heads * q_len, v_len)
+    // v_pts: (v_len, no_heads * no_v_points * 3)
+    // r: (q_len, 4*4)
+    // out: (q_len, [col_offset +] (3 * no_heads * no_v_points) + (no_heads * no_v_points))
+    int q_len = out.n_rows;
+    int v_len = v_pts.n_rows;
+    int no_heads = a.n_rows / q_len;
+    int no_v_points = v_pts.n_cols / (3 * no_heads);
+    for (int i = 0; i < q_len; i ++) {
+        for (int h = 0; h < no_heads; h ++) {
+            for (int p = 0; p < no_v_points; p++) {
+                float sum_crd[3] = {0.0f, 0.0f, 0.0f};
+                for (int j = 0; j < v_len; j ++) {
+                    float w = *a(h * q_len + i, j);
+                    sum_crd[0] += w * *v_pts(j, h * no_v_points * 3 + p * 3 + 0);
+                    sum_crd[1] += w * *v_pts(j, h * no_v_points * 3 + p * 3 + 1);
+                    sum_crd[2] += w * *v_pts(j, h * no_v_points * 3 + p * 3 + 2);
+                }
+                invert_apply_affine(r(i, 0), sum_crd, sum_crd);
+                float norm = sqrtf(sum_crd[0] * sum_crd[0] + sum_crd[1] * sum_crd[1] + sum_crd[2] * sum_crd[2] + EPS);
+                *out(i, col_offset + 0 * no_heads * no_v_points + h * no_v_points + p) = sum_crd[0];
+                *out(i, col_offset + 1 * no_heads * no_v_points + h * no_v_points + p) = sum_crd[1];
+                *out(i, col_offset + 2 * no_heads * no_v_points + h * no_v_points + p) = sum_crd[2];
+                *out(i, col_offset + 3 * no_heads * no_v_points + h * no_v_points + p) = norm;
+            }
+        }
+    }
+}
+
+inline void compute_output_pair(const matrix<float> &a, const matrix<float> &z, matrix<float> &out, int col_offset) {
+    // a: (no_heads * q_len, v_len)
+    // z: (q_len*v_len, c_z)
+    // out: (q_len, [col_offset +] no_heads * c_z)
+    int q_len = out.n_rows;
+    int v_len = a.n_cols;
+    int no_heads = a.n_rows / q_len;
+    int c_z = z.n_cols;
+    for (int i = 0; i < q_len; i ++) {
+        for (int h = 0; h < no_heads; h ++) {
+            for (int k = 0; k < c_z; k ++) {
+                float sum = 0.0f;
+                for (int j = 0; j < v_len; j ++) {
+                    float w = *a(h * q_len + i, j);
+                    sum += w * *z(i * v_len + j, k);
+                }
+                *out(i, col_offset + h * c_z + k) = sum;
+            }
+        }
+    }
+}
 
 struct IPAConfig {
     int c_s;
@@ -140,6 +221,7 @@ struct IPAForwardBuffer {
     matrix<float> v_pts;
 
     matrix<float> a;
+    matrix<float> o;
 
     IPAForwardBuffer(int seqlen, const IPAConfig &cfg):
         seqlen(seqlen),
@@ -150,7 +232,8 @@ struct IPAForwardBuffer {
         q_pts(seqlen, cfg.no_heads * cfg.no_qk_points * 3),
         k_pts(seqlen, cfg.no_heads * cfg.no_qk_points * 3),
         v_pts(seqlen, cfg.no_heads * cfg.no_v_points * 3),
-        a(cfg.no_heads * seqlen, seqlen)
+        a(cfg.no_heads * seqlen, seqlen),
+        o(seqlen, cfg.no_heads * (cfg.c_z + cfg.c_hidden + cfg.no_v_points * 4))
     {}
 
     inline float * q_loc(int i, int h, int d) {
@@ -204,9 +287,10 @@ struct InvariantPointAttention
 
         linear_b_weight(cfg.no_heads, cfg.c_z),
         linear_b_bias(cfg.no_heads, 1),
-        linear_out_weight(cfg.no_heads * (cfg.c_z + cfg.c_hidden + cfg.no_v_points) * 4, cfg.c_s),
-        linear_out_bias(cfg.no_heads * (cfg.c_z + cfg.c_hidden + cfg.no_v_points) * 4, 1)
+        linear_out_weight(cfg.no_heads * (cfg.c_z + cfg.c_hidden + cfg.no_v_points * 4), cfg.c_s),
+        linear_out_bias(cfg.no_heads * (cfg.c_z + cfg.c_hidden + cfg.no_v_points * 4), 1)
     {
+        std::cerr << "Loading weights for InvariantPointAttention from " << dirpath << std::endl;
         load_(head_weights, dirpath + "/head_weights.bin");
         load_(linear_q_weight, dirpath + "/linear_q.weight.bin");
         load_(linear_q_bias, dirpath + "/linear_q.bias.bin");
@@ -281,6 +365,8 @@ struct InvariantPointAttention
         load_(linear_b_bias, dirpath + "/linear_b.bias.bin");
         load_(linear_out_weight, dirpath + "/linear_out.weight.bin");
         load_(linear_out_bias, dirpath + "/linear_out.bias.bin");
+
+        std::cerr << "InvariantPointAttention weights loaded." << std::endl;
     }
 
     void operator()(const matrix<float> &s, const matrix<float> &z, const matrix<float> &r, matrix<float> &out, IPAForwardBuffer &buffer)
@@ -314,6 +400,10 @@ struct InvariantPointAttention
         pair_bias_linear_accumulate(z, linear_b_weight, linear_b_bias, sqrtf(1.0f / 3.0f), buffer.a);
         qk_pnts_accumulate(buffer.q_pts, buffer.k_pts, head_weights, buffer.a);
         softmax_(buffer.a);
+
+        compute_output(buffer.a, buffer.v, buffer.o, 0);
+        compute_output_pts(buffer.a, buffer.v_pts, r, buffer.o, cfg.no_heads * cfg.c_hidden);
+        compute_output_pair(buffer.a, z, buffer.o, cfg.no_heads * cfg.c_hidden + cfg.no_heads * cfg.no_v_points * 4);
     }
 };
 

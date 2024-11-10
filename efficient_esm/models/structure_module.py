@@ -404,6 +404,7 @@ class InvariantPointAttention(nn.Module):
                 "kv_pts": kv_pts,
                 "b": b,
                 "a": a,
+                "o": torch.cat((o, *torch.unbind(o_pt, dim=-1), o_pt_norm, o_pair), dim=-1),
             }
         else:
             return s
