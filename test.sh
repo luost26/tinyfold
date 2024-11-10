@@ -1,5 +1,5 @@
 python ./scripts/generate_test_data/ipa.py
 
 pushd ./build
-make && ./main
+cmake .. && make && ./main
 popd
