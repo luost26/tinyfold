@@ -2,14 +2,17 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
+import os
 import typing
 from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 import torch.nn as nn
 from torch.nn import LayerNorm
 
 from efficient_esm.data.alphabet import Alphabet
+from efficient_esm.utils.export import export_tensor_dict, export_value_list
 
 from .esm2 import ESM2
 from .esm_misc import batch_encode_sequences, collate_dense_tensors, output_to_pdb
@@ -206,21 +209,21 @@ class ESMFold(nn.Module):
 
         structure: dict = self.trunk(s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles)
         # Documenting what we expect:
-        structure = {
-            k: v
-            for k, v in structure.items()
-            if k
-            in [
-                "s_z",
-                "s_s",
-                "frames",
-                "sidechain_frames",
-                "unnormalized_angles",
-                "angles",
-                "positions",
-                "states",
-            ]
-        }
+        # structure = {
+        #     k: v
+        #     for k, v in structure.items()
+        #     if k
+        #     in [
+        #         "s_z",
+        #         "s_s",
+        #         "frames",
+        #         "sidechain_frames",
+        #         "unnormalized_angles",
+        #         "angles",
+        #         "positions",
+        #         "states",
+        #     ]
+        # }
 
         disto_logits = self.distogram_head(structure["s_z"])
         disto_logits = (disto_logits + disto_logits.transpose(1, 2)) / 2
@@ -259,6 +262,9 @@ class ESMFold(nn.Module):
         #     ]
         # )
         # structure.update(compute_predicted_aligned_error(ptm_logits, max_bin=31, no_bins=self.distogram_bins))
+        
+        # DEBUG: Intermediate results
+        structure.update({"esm_s": esm_s.float(), "esm_z": esm_z.float()})
 
         return structure
 
@@ -309,6 +315,8 @@ class ESMFold(nn.Module):
             masking_pattern=masking_pattern,
             num_recycles=num_recycles,
         )
+        output["aatype"] = aatype
+        output["residx"] = residx
 
         output["atom37_atom_exists"] = output["atom37_atom_exists"] * linker_mask.unsqueeze(2)
 
@@ -343,3 +351,24 @@ class ESMFold(nn.Module):
     @property
     def device(self):
         return self.esm_s_combine.device
+
+    def export(self, dirpath: str | Path) -> None:
+        dirpath = Path(dirpath)
+        os.makedirs(dirpath, exist_ok=True)
+        adaptor_state_dict: dict[str, torch.Tensor] = {
+            k: v for k, v in self.state_dict().items()
+            if not (k.startswith("esm.") or k.startswith("trunk.structure_module."))
+        }
+        export_tensor_dict(adaptor_state_dict, dirpath / "adaptor")
+        self.trunk.structure_module.export(dirpath / "structure_module")
+        export_value_list([
+            self.cfg.trunk.sequence_state_dim,  # c_s
+            self.cfg.trunk.pairwise_state_dim,  # c_z
+            self.cfg.trunk.structure_module.c_s,
+            self.cfg.trunk.structure_module.c_z,
+            self.esm_feats,
+            self.esm_attns,
+            self.esm.num_layers,
+            self.trunk.cfg.position_bins,
+            self.trunk.recycle_bins,
+        ], dirpath / "config.txt")

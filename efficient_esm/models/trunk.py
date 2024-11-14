@@ -152,7 +152,8 @@ class FoldingTrunk(nn.Module):
         s_z_0 = pair_feats
 
         if no_recycles is None:
-            no_recycles = self.cfg.max_recycles
+            # no_recycles = self.cfg.max_recycles
+            no_recycles = 1
         else:
             assert no_recycles >= 0, "Number of recycles must not be negative."
             no_recycles += 1  # First 'recycle' is just the standard forward pass through the model.
@@ -175,11 +176,15 @@ class FoldingTrunk(nn.Module):
                 s_z = s_z_0 + recycle_z + self.pairwise_positional_embedding(residx, mask=mask)
 
                 # === Structure module ===
+                sm_input = {"single": self.trunk2sm_s(s_s), "pair": self.trunk2sm_z(s_z)}
                 structure = self.structure_module(
-                    {"single": self.trunk2sm_s(s_s), "pair": self.trunk2sm_z(s_z)},
+                    sm_input,
                     true_aa,
                     mask.float(),
                 )
+                # DEBUG: Intermediate results
+                structure["sm_input_single"] = sm_input["single"].clone().detach()
+                structure["sm_input_pair"] = sm_input["pair"].clone().detach()
 
                 recycle_s = s_s
                 recycle_z = s_z
