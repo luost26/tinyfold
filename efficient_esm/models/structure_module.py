@@ -209,8 +209,8 @@ class InvariantPointAttention(nn.Module):
 
     def export(self, dirpath: str | Path) -> None:
         dirpath = Path(dirpath)
-        torch.save(self.state_dict(), dirpath / "state_dict.pt")
         export_tensor_dict(self.state_dict(), dirpath)
+        torch.save(self.state_dict(), dirpath / "state_dict.pt")
         export_value_list(
             [self.c_s, self.c_z, self.c_hidden, self.no_heads, self.no_qk_points, self.no_v_points],
             dirpath / "config.txt",
@@ -611,6 +611,7 @@ class StructureModule(nn.Module):
         mask=None,
         inplace_safe=False,
         _offload_inference=False,
+        return_intermediates=False,
     ):
         """
         Args:
@@ -627,6 +628,7 @@ class StructureModule(nn.Module):
         Returns:
             A dictionary of outputs
         """
+        intermediates: dict[str, torch.Tensor] = {}
         s = evoformer_output_dict["single"]
 
         if mask is None:
@@ -648,6 +650,10 @@ class StructureModule(nn.Module):
         # [*, N, C_s]
         s_initial = s
         s = self.linear_in(s)
+
+        if return_intermediates:
+            intermediates["s_1"] = s.clone()
+            intermediates["z_1"] = z.clone()
 
         # [*, N]
         rigids = Rigid.identity(
@@ -672,6 +678,8 @@ class StructureModule(nn.Module):
             s = self.ipa_dropout(s)
             s = self.layer_norm_ipa(s)
             s = self.transition(s)
+            if return_intermediates:
+                intermediates[f"s_ipa_{i}"] = s.clone()
 
             # [*, N]
             rigids = rigids.compose_q_update_vec(self.bb_update(s))
@@ -722,6 +730,7 @@ class StructureModule(nn.Module):
 
         outputs = dict_multimap(torch.stack, outputs)
         outputs["single"] = s
+        outputs.update(intermediates)
 
         return outputs
 
@@ -770,4 +779,25 @@ class StructureModule(nn.Module):
             self.group_idx,
             self.atom_mask,
             self.lit_positions,
+        )
+
+    def export(self, dirpath: str | Path) -> None:
+        dirpath = Path(dirpath)
+        self.ipa.export(dirpath / "ipa")
+        sd = {k: v for k, v in self.state_dict().items() if not k.startswith("ipa.")}
+        export_tensor_dict(self.state_dict(), dirpath)
+        torch.save(sd, dirpath / "state_dict.pt")
+        export_value_list(
+            [
+                self.c_s,
+                self.c_z,
+                self.c_ipa,
+                self.c_resnet,
+                self.no_blocks,
+                self.no_transition_layers,
+                self.no_resnet_blocks,
+                self.no_angles,
+                self.trans_scale_factor,
+            ],
+            dirpath / "config.txt",
         )

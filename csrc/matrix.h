@@ -57,6 +57,11 @@ struct matrix
 template <bool transposed_B = false, bool residual = false, typename T>
 void matmul(const matrix<T> &A, const matrix<T> &B, matrix<T> &C)
 {
+    if (&A == &C || &B == &C)
+    {
+        std::cerr << "Matrix multiplication cannot be done inplace" << std::endl;
+        exit(1);
+    }
     int I, J, K1, K2;
     if (transposed_B) {
         I = A.n_rows;
@@ -98,9 +103,17 @@ void matmul(const matrix<T> &A, const matrix<T> &B, matrix<T> &C)
 }
 
 
-template <bool transposed_B = false, bool is_bias_vector = false, bool residual = false, typename T>
+enum ActivationType {None, ReLU};
+
+
+template <bool transposed_B = false, bool is_bias_vector = false, bool residual = false, ActivationType act_type = None, typename T>
 void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, matrix<T> &C)
 {
+    if (&A == &C || &B == &C)
+    {
+        std::cerr << "Matrix multiplication cannot be done inplace" << std::endl;
+        exit(1);
+    }
     int I, J, K1, K2;
     if (transposed_B) {
         I = A.n_rows;
@@ -155,6 +168,10 @@ void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, m
                     sum += *A(i, k) * *B(k, j);
                 }
             }
+            if (act_type == ReLU) {
+                sum = std::max((T)0, sum);
+            }
+
             if (residual) {
                 *C(i, j) += sum;
             } else {
@@ -199,6 +216,16 @@ inline void fill_(matrix<T> & A, T val) {
 template <typename T>
 inline void zero_(matrix<T> & A) {
     memset(A.data, 0, A.n_rows * A.n_cols * sizeof(T));
+}
+
+
+template <typename T>
+inline void add_(matrix<T> &A, const matrix<T> &B) {
+    for (int i = 0; i < A.n_rows; i++) {
+        for (int j = 0; j < A.n_cols; j++) {
+            *A(i, j) += *B(i, j);
+        }
+    }
 }
 
 
@@ -260,6 +287,17 @@ std::ostream& operator<<(std::ostream &os, const matrix<T> &A)
     }
     os << ", size=(" << A.n_rows << ", " << A.n_cols << ")]\n";
     return os;
+}
+
+#define TEST_ALLCLOSE(NAME,A,B,ATOL) { \
+    float error; \
+    if (!allclose(A, B, ATOL, &error)) { \
+        std::cout << "Test " << NAME << ": FAIL, error = " << error << std::endl; \
+        std::cout << "Expected:\n" << B << std::endl; \
+        std::cout << "Got:\n" << A << std::endl; \
+    } else { \
+        std::cout << "Test " << NAME << ": PASS" << std::endl; \
+    } \
 }
 
 #endif

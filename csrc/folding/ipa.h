@@ -369,6 +369,10 @@ struct InvariantPointAttention
         std::cerr << "InvariantPointAttention weights loaded." << std::endl;
     }
 
+    IPAForwardBuffer * create_buffer(int seqlen) const {
+        return new IPAForwardBuffer(seqlen, cfg);
+    }
+
     void operator()(const matrix<float> &s, const matrix<float> &z, const matrix<float> &r, matrix<float> &out, IPAForwardBuffer &buffer, bool residual)
     {
         // s: (len, s_dim)
