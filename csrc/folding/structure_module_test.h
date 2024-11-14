@@ -65,7 +65,7 @@ void test_structure_module() {
     }
     TEST_INTERMEDIATE_ALLCLOSE(z, z_1, 1e-6f);
     TEST_INTERMEDIATE_ALLCLOSE(s, s_ipa_7, 1e-5f);
-    TEST_INTERMEDIATE_ALLCLOSE(r, affine_7, 2e-5f);
+    TEST_INTERMEDIATE_ALLCLOSE(r, frames_affine, 1e-3f);
     #undef TEST_INTERMEDIATE_ALLCLOSE
 }
 

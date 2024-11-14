@@ -150,7 +150,7 @@ struct StructureModuleConfig {
             std::cerr << "Could not open config file" << std::endl;
             exit(1);
         }
-        cfg_file >> c_s >> c_z >> c_ipa >> c_resnet >> no_blocks >> no_transition_layers >> no_resnet_blocks >> no_angles;
+        cfg_file >> c_s >> c_z >> c_ipa >> c_resnet >> no_blocks >> no_transition_layers >> no_resnet_blocks >> no_angles >> trans_scale_factor;
     }
 };
 
@@ -299,6 +299,12 @@ struct StructureModule {
             layer_norm(buffer.s, layer_norm_ipa_weight, layer_norm_ipa_bias, buffer.s);
             transition(buffer);
             update_rigids(buffer);
+        }
+
+        for (int i = 0; i < buffer.seqlen; i ++) {
+            *buffer.r(i, 3) *= cfg.trans_scale_factor;
+            *buffer.r(i, 7) *= cfg.trans_scale_factor;
+            *buffer.r(i, 11) *= cfg.trans_scale_factor;
         }
     }
 };
