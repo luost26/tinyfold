@@ -23,7 +23,26 @@ constexpr float _QUAT_MULTIPLY_BY_VEC[4][3][4] = {
 };
 
 
-inline void affine_to_quat(float *r, float *quat) {
+inline void normalize_quat_(float *quat) {
+    float length = 0.0f;
+    for (int i = 0; i < 4; i ++) {
+        length += quat[i] * quat[i];
+    }
+    length = sqrtf(length);
+    for (int i = 0; i < 4; i ++) {
+        quat[i] /= length;
+    }   
+}
+
+inline void standarize_quat_(float *quat) {
+    if (quat[0] < 0) {
+        for (int i = 0; i < 4; i ++) {
+            quat[i] = -quat[i];
+        }
+    }
+}
+
+inline void affine_to_quat(const float *r, float *quat) {
     float m00 = r[0], m01 = r[1], m02 = r[2];
     float m10 = r[4], m11 = r[5], m12 = r[6];
     float m20 = r[8], m21 = r[9], m22 = r[10];
@@ -42,7 +61,6 @@ inline void affine_to_quat(float *r, float *quat) {
         }
     }
 
-    float quat[4] = {0};
     #define UNPACK_QUAT(out,q1,q2,q3,q4) { out[0] = q1; out[1] = q2; out[2] = q3; out[3] = q4; }
     switch (best_q_idx) {
     case 0:
@@ -59,13 +77,27 @@ inline void affine_to_quat(float *r, float *quat) {
     }
     #undef UNPACK_QUAT
 
-    if (quat[0] < 0) {
-        for (int i = 0; i < 4; i ++) {
-            quat[i] = -quat[i];
-        }
-    }
+    normalize_quat_(quat);
+    standarize_quat_(quat);
 }
 
+
+inline void quat_to_affine(const float *quat, float *affine) {
+    float r = quat[0], i = quat[1], j = quat[2], k = quat[3];
+    float two_s = 2.0 / (r * r + i * i + j * j + k * k);
+    // Row 0
+    affine[0] = 1 - two_s * (j * j + k * k);
+    affine[1] = two_s * (i * j - k * r);
+    affine[2] = two_s * (i * k + j * r);
+    // Row 1
+    affine[4] = two_s * (i * j + k * r);
+    affine[5] = 1 - two_s * (i * i + k * k);
+    affine[6] = two_s * (j * k - i * r);
+    // Row 2
+    affine[8] = two_s * (i * k - j * r);
+    affine[9] = two_s * (j * k + i * r);
+    affine[10] = 1 - two_s * (i * i + j * j);
+}
 
 inline void apply_q_update(float *r, const float *q_update) {
     float quat[4];
@@ -79,16 +111,8 @@ inline void apply_q_update(float *r, const float *q_update) {
             }
         }
     }
-    
-    float length = 0.0f;
-    for (int i = 0; i < 4; i ++) {
-        length += new_quat[i] * new_quat[i];
-    }
-    length = sqrtf(length);
-    for (int i = 0; i < 4; i ++) {
-        new_quat[i] /= length;
-    }
 
+    normalize_quat_(new_quat);
 }
 
 struct StructureModuleConfig {

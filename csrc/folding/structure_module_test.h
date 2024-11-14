@@ -3,7 +3,46 @@
 
 #include <iostream>
 #include <memory>
+#include <random>
 #include "structure_module.h"
+
+void test_affine_quat_conversion() {
+    std::cout << "====== Test Quaternion-Matrix Conversion ======" << std::endl;
+
+    float quat[4];
+    float r[16] = {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    };
+
+    // Random quaternion from 4d gaussian
+    std::default_random_engine generator;
+    std::normal_distribution<float> distribution(0.0, 1.0);
+    for (int i = 0; i < 4; i++) {
+        quat[i] = distribution(generator);
+    }
+    normalize_quat_(quat);
+    standarize_quat_(quat);
+    std::cout << quat[0] << quat[1] << quat[2] << quat[3] << std::endl;
+
+    float quat_2[4];
+    quat_to_affine(quat, r);
+    affine_to_quat(r, quat_2);
+    std::cout << quat_2[0] << quat_2[1] << quat_2[2] << quat_2[3] << std::endl;
+
+    bool failed = false;
+    for (int i = 0; i < 4; i++) {
+        if (!(std::abs(quat[i] - quat_2[i]) < 1e-6)) {
+            std::cout << "Test failed: quat[" << i << "] = " << quat[i] << " != quat_2[" << i << "] = " << quat_2[i] << std::endl;
+            failed = true;
+        }
+    }
+    if (!failed) {
+        std::cout << "Test passed." << std::endl;
+    }
+}
 
 void test_structure_module() {
     std::cout << "====== Test Structure Module ======" << std::endl;
