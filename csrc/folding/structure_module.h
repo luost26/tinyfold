@@ -8,20 +8,6 @@
 #include "linear.h"
 #include "ipa.h"
 
-constexpr float _QUAT_MULTIPLY[4][4][4] = {
-    {{1, 0, 0, 0}, {0, -1, 0, 0}, {0, 0, -1, 0}, {0, 0, 0, -1}},
-    {{0, 1, 0, 0}, {1, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, -1, 0}},
-    {{0, 0, 1, 0}, {0, 0, 0, -1}, {1, 0, 0, 0}, {0, 1, 0, 0}},
-    {{0, 0, 0, 1}, {0, 0, 1, 0}, {0, -1, 0, 0}, {1, 0, 0, 0}}
-};
-
-constexpr float _QUAT_MULTIPLY_BY_VEC[4][3][4] = {
-    {{0, -1, 0, 0}, {0, 0, -1, 0}, {0, 0, 0, -1}},
-    {{1, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, -1, 0}},
-    {{0, 0, 0, -1}, {1, 0, 0, 0}, {0, 1, 0, 0}},
-    {{0, 0, 1, 0}, {0, -1, 0, 0}, {1, 0, 0, 0}}
-};
-
 
 inline void normalize_quat_(float *quat) {
     float length = 0.0f;
@@ -40,6 +26,30 @@ inline void standarize_quat_(float *quat) {
             quat[i] = -quat[i];
         }
     }
+}
+
+inline void apply_affine_rotation_only(const float *r, const float *v, float *v_new) {
+    float x = r[0] * v[0] + r[1] * v[1] + r[2] * v[2];
+    float y = r[4] * v[0] + r[5] * v[1] + r[6] * v[2];
+    float z = r[8] * v[0] + r[9] * v[1] + r[10] * v[2];
+    v_new[0] = x;
+    v_new[1] = y;
+    v_new[2] = z;
+}
+
+inline void compose_rotation(const float *affine1, const float *affine2, float *out) {
+    float new_rot[9];
+    for (int i = 0; i < 3; i ++) {
+        for (int j = 0; j < 3; j ++) {
+            new_rot[i * 3 + j] = 0.0f;
+            for (int k = 0; k < 3; k ++) {
+                new_rot[i * 3 + j] += affine1[i * 4 + k] * affine2[k * 4 + j];
+            }
+        }
+    }
+    out[0] = new_rot[0]; out[1] = new_rot[1]; out[2] = new_rot[2];
+    out[4] = new_rot[3]; out[5] = new_rot[4]; out[6] = new_rot[5];
+    out[8] = new_rot[6]; out[9] = new_rot[7]; out[10] = new_rot[8];
 }
 
 inline void affine_to_quat(const float *r, float *quat) {
@@ -99,20 +109,24 @@ inline void quat_to_affine(const float *quat, float *affine) {
     affine[10] = 1 - two_s * (i * i + j * j);
 }
 
-inline void apply_q_update(float *r, const float *q_update) {
-    float quat[4];
-    affine_to_quat(r, quat);
+inline void apply_qt_update(const float *r, const float *qt_update, float *r_new) {
+    float trans_update[3] = {qt_update[3], qt_update[4], qt_update[5]};
+    apply_affine_rotation_only(r, trans_update, trans_update);
+    r_new[3] = r[3] + trans_update[0];
+    r_new[7] = r[7] + trans_update[1];
+    r_new[11] = r[11] + trans_update[2];
 
-    float new_quat[4] = {quat[0], quat[1], quat[2], quat[3]};
-    for (int k = 0; k < 4; k ++) {
-        for (int i = 0; i < 4; i ++) {
-            for (int j = 0; j < 3; j ++) {
-                new_quat[k] += _QUAT_MULTIPLY[i][j][k] * quat[i] * q_update[j];
-            }
-        }
-    }
-
-    normalize_quat_(new_quat);
+    float quat_update[4] = {1.0, qt_update[0], qt_update[1], qt_update[2]};
+    normalize_quat_(quat_update);
+    standarize_quat_(quat_update);
+    float affine_update[16] = {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 0,
+    };
+    quat_to_affine(quat_update, affine_update);
+    compose_rotation(r, affine_update, r_new);
 }
 
 struct StructureModuleConfig {
@@ -218,7 +232,7 @@ struct StructureModule {
         transition_layer_norm_weight(cfg.c_s, 1),
         transition_layer_norm_bias(cfg.c_s, 1),
 
-        bb_update_linear_weight(cfg.c_s, 6),
+        bb_update_linear_weight(6, cfg.c_s),
         bb_update_linear_bias(6, 1)
     {
         std::cerr << "Loading weights for StructureModule from " << dirpath << std::endl;
@@ -239,6 +253,9 @@ struct StructureModule {
         load_(transition_layers_0_linear_3_bias, dirpath + "/transition.layers.0.linear_3.bias.bin");
         load_(transition_layer_norm_weight, dirpath + "/transition.layer_norm.weight.bin");
         load_(transition_layer_norm_bias, dirpath + "/transition.layer_norm.bias.bin");
+
+        load_(bb_update_linear_weight, dirpath + "/bb_update.linear.weight.bin");
+        load_(bb_update_linear_bias, dirpath + "/bb_update.linear.bias.bin");
     }
 
     StructureModuleBuffer * create_buffer(int seqlen) const {
@@ -254,7 +271,7 @@ struct StructureModule {
         layer_norm(buffer.s, transition_layer_norm_weight, transition_layer_norm_bias, buffer.s);
     }
 
-    inline void bb_update(StructureModuleBuffer &buffer) {
+    inline void update_rigids(StructureModuleBuffer &buffer) {
         for (int i = 0; i < buffer.seqlen; i ++) {
             float update_vec[6] = {
                 *bb_update_linear_bias(0, 0),
@@ -264,12 +281,12 @@ struct StructureModule {
                 *bb_update_linear_bias(4, 0),
                 *bb_update_linear_bias(5, 0)
             };
-            float *q_vec = update_vec, *k_vec = update_vec + 3;
             for (int j = 0; j < 6; j ++) {
-                for (int k = 0; k < cfg.c_s; j ++) {
-                    q_vec[j] += *buffer.s(i, k) * *bb_update_linear_weight(k, j);
+                for (int k = 0; k < cfg.c_s; k ++) {
+                    update_vec[j] += *buffer.s(i, k) * *bb_update_linear_weight(j, k);
                 }
             }
+            apply_qt_update(buffer.r(i, 0), update_vec, buffer.r(i, 0));
         }
     }
 
@@ -277,11 +294,12 @@ struct StructureModule {
         layer_norm(z, layer_norm_z_weight, layer_norm_z_bias, buffer.z);        
         fused_layer_norm_linear(s, layer_norm_s_weight, layer_norm_s_bias, linear_in_weight, linear_in_bias, buffer.s);
 
-        // for (int i = 0; i < cfg.no_blocks; i ++) {
-        (*ipa)(buffer.s, buffer.z, buffer.r, buffer.s, *buffer.ipa_buffer, true);
-        layer_norm(buffer.s, layer_norm_ipa_weight, layer_norm_ipa_bias, buffer.s);
-        transition(buffer);
-
+        for (int i = 0; i < cfg.no_blocks; i ++) {
+            (*ipa)(buffer.s, buffer.z, buffer.r, buffer.s, *buffer.ipa_buffer, true);
+            layer_norm(buffer.s, layer_norm_ipa_weight, layer_norm_ipa_bias, buffer.s);
+            transition(buffer);
+            update_rigids(buffer);
+        }
     }
 };
 
