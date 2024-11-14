@@ -1,7 +1,9 @@
 import torch
 import random
+import sys
 from pathlib import Path
 from efficient_esm.models.structure_module import InvariantPointAttention, Rigid, StructureModule
+from efficient_esm.models.esmfold import ESMFold
 from efficient_esm.utils.export import export_tensor_dict
 
 torch.set_grad_enabled(False)
@@ -68,5 +70,32 @@ def structure_module():
     export_tensor_dict(out, output_dir / "output")
 
 
+def esmfold_folding_only():
+    esmfold_path = "./data/esmfold_structure_module_only_3B.pt"
+    esm_path = "./data/esm2_t36_3B_UR50D.pt"
+    device = "cuda"
+    print(f"Loading model from {esmfold_path} and {esm_path}")
+    model = ESMFold.load(esmfold_path, esm_path).to(device)
+    model.eval()
+    print("Exporting model")
+    model.export(Path("./data/c_test/esmfold_folding_only"))
+
+    print("Generating test data")
+    seq = "ASAWPEEKNYHQPAILNSSALRQIAEGTSISEMWQNDLQPLLIERYPGSPGSYAARQHIMQRIQRLQADWVLEIDTFLSQTPYGYRSFSNIISTLNPTAKRHLVLACHYDSKYFSHWNNRVFVGATDSAVPCAMMLELARALDKKLLSLKTVSDSKPDLSLQLIFFDGEEAFLHWSPQDSLYGSRHLAAKMASTPHPPGARGTSQLHGMDLLVLLDLIGAPNPTFPNFFPNSARWFERLQAIEHELHELGLLKDHSLEGRYFQNYSYGGVIQDDHIPFLRRGVPVLHLIPSPFPEVWHTMDDNEENLDESTIDNLNKILQVFVLEYLHL"  # noqa
+    out = model.infer(seq)
+    plddt = out["mean_plddt"].item()
+    print(f"pLDDT: {plddt:.2f}")
+
+    export_tensor_dict(
+        {"esm_s": out["esm_s"], "esm_z": out["esm_z"], "aatype": out["aatype"], "residx": out["residx"]},
+        Path("./data/c_test/esmfold_folding_only") / "input",
+    )
+    export_tensor_dict(out, Path("./data/c_test/esmfold_folding_only") / "output")
+
+
 if __name__ == "__main__":
-    structure_module()
+    if len(sys.argv) != 2:
+        print("Usage: python scripts/generate_test_data.py <which>")
+        sys.exit(1)
+    which = sys.argv[1]
+    globals()[which]()
