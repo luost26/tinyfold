@@ -664,6 +664,9 @@ class StructureModule(nn.Module):
             fmt="quat",
         )
         outputs = []
+        if return_intermediates:
+            intermediates["affine_init"] = rigids.to_tensor_4x4().clone()
+
         for i in range(self.no_blocks):
             # [*, N, C_s]
             s = s + self.ipa(
@@ -678,11 +681,14 @@ class StructureModule(nn.Module):
             s = self.ipa_dropout(s)
             s = self.layer_norm_ipa(s)
             s = self.transition(s)
-            if return_intermediates:
-                intermediates[f"s_ipa_{i}"] = s.clone()
 
             # [*, N]
-            rigids = rigids.compose_q_update_vec(self.bb_update(s))
+            update_vec = self.bb_update(s)
+            rigids = rigids.compose_q_update_vec(update_vec)
+            if return_intermediates:
+                intermediates[f"update_{i}"] = update_vec.clone()
+                intermediates[f"s_ipa_{i}"] = s.clone()
+                intermediates[f"affine_{i}"] = rigids.to_tensor_4x4().clone()
 
             # To hew as closely as possible to AlphaFold, we convert our
             # quaternion-based transformations to rotation-matrix ones
@@ -731,6 +737,7 @@ class StructureModule(nn.Module):
         outputs = dict_multimap(torch.stack, outputs)
         outputs["single"] = s
         outputs.update(intermediates)
+        outputs["frames_affine"] = scaled_rigids.to_tensor_4x4()
 
         return outputs
 
