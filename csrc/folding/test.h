@@ -5,6 +5,7 @@
 #include <memory>
 #include "adaptor.h"
 #include "structure_module.h"
+#include "to_pdb.h"
 
 
 void test_folding() {
@@ -51,7 +52,10 @@ void test_folding() {
     TEST_INTERMEDIATE_ALLCLOSE(r, frames_affine, 1e-3f);
     #undef TEST_INTERMEDIATE_ALLCLOSE
 
-    std::cout << sm_buffer->r << std::endl;
+
+    std::string pdb_out = to_pdb(sm_buffer->r, aatype);
+    std::cout << "PDB output: \n" << pdb_out << std::endl;
+    // std::cout << sm_buffer->r << std::endl;
 }
 
 

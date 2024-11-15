@@ -143,4 +143,43 @@ inline void quat_to_affine(const float *quat, float *affine) {
     affine[10] = 1 - two_s * (i * i + j * j);
 }
 
+
+inline float dihedral_from_four_points(const float *p0, const float *p1, const float *p2, const float *p3) {
+    #define INIT_VEC_MINUS(A,B) {A[0] - B[0], A[1] - B[1], A[2] - B[2]}
+    #define INIT_VEC_CROSS(A,B) {A[1] * B[2] - A[2] * B[1], A[2] * B[0] - A[0] * B[2], A[0] * B[1] - A[1] * B[0]}
+    #define NORMALIZE_(VEC) { float norm = sqrtf(VEC[0] * VEC[0] + VEC[1] * VEC[1] + VEC[2] * VEC[2]); VEC[0] /= norm; VEC[1] /= norm; VEC[2] /= norm; }
+    #define INNERPROD(A,B) (A[0] * B[0] + A[1] * B[1] + A[2] * B[2])
+
+    float v0[3] = INIT_VEC_MINUS(p2, p1);
+    float v1[3] = INIT_VEC_MINUS(p0, p1);
+    float v2[3] = INIT_VEC_MINUS(p3, p2);
+    
+    float n1[3] = INIT_VEC_CROSS(v0, v1);
+    NORMALIZE_(n1);
+
+    float n2[3] = INIT_VEC_CROSS(v0, v2);
+    NORMALIZE_(n2);
+
+    float u3[3] = INIT_VEC_CROSS(v1, v2);
+    float sgn = INNERPROD(u3, v0) >= 0 ? 1.0f : -1.0f;
+
+    float cos_theta = INNERPROD(n1, n2);
+    if (cos_theta > 0.999999) {
+        cos_theta = 0.999999;
+    } else if (cos_theta < -0.999999) {
+        cos_theta = -0.999999;
+    }
+    float dihed = sgn * acosf(cos_theta);
+    if (dihed != dihed) {
+        dihed = 0.0f;
+    }
+
+    #undef INIT_VEC_MINUS
+    #undef INIT_VEC_CROSS
+    #undef NORMALIZE_
+    #undef INNERPROD
+
+    return dihed;
+}
+
 #endif
