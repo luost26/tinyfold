@@ -53,13 +53,14 @@ void linear_(matrix<T> &x, const matrix<T> &weight, const matrix<T> &bias) {
         int thread_idx = omp_get_thread_num();
         T * buffer = buffer_all + thread_idx * channels;
         for (int j = 0; j < channels; j ++) {
-            buffer[j] = *bias(j, 0);
+            T sum = *bias(j, 0);
             for (int k = 0; k < channels; k ++) {
-                buffer[j] += *x(i, k) * *weight(j, k);
+                sum += *x(i, k) * *weight(j, k);
             }
             if (act_type == ReLU) {
-                buffer[j] = buffer[j] > 0 ? buffer[j] : 0;
+                sum = sum > 0 ? sum : 0;
             }
+            buffer[j] = sum;
         }
         for (int j = 0; j < channels; j ++) {
             *x(i, j) = buffer[j];
