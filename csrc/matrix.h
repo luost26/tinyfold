@@ -16,6 +16,7 @@ struct matrix
     matrix(int n_rows, int n_cols) : n_rows(n_rows), n_cols(n_cols)
     {
         data = new T[n_rows * n_cols];
+        std::memset(data, 0, n_rows * n_cols * sizeof(T));
     }
 
     matrix(T * data, int n_rows, int n_cols) : data(data), n_rows(n_rows), n_cols(n_cols) {}
