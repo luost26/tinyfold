@@ -169,6 +169,7 @@ class ESMFold(nn.Module):
             num_recycles (int): How many recycle iterations to perform. If None, defaults to training max
                 recycles, which is 3.
         """
+        intermediates: dict[str, torch.Tensor] = {}
 
         if mask is None:
             mask = torch.ones_like(aa)
@@ -197,6 +198,9 @@ class ESMFold(nn.Module):
         # === preprocessing ===
         esm_s = (self.esm_s_combine.softmax(0).unsqueeze(0) @ esm_s).squeeze(2)
 
+        intermediates["esm_s"] = esm_s.clone().detach()
+        intermediates["esm_z"] = esm_z.clone().detach()
+
         s_s_0 = self.esm_s_mlp(esm_s)
         if self.cfg.use_esm_attn_map:
             esm_z = esm_z.to(self.esm_s_combine.dtype)
@@ -206,6 +210,9 @@ class ESMFold(nn.Module):
             s_z_0 = s_s_0.new_zeros(B, L, L, self.cfg.trunk.pairwise_state_dim)
 
         s_s_0 += self.embedding(aa)
+
+        intermediates["s_s_0"] = s_s_0.clone().detach()
+        intermediates["s_z_0"] = s_z_0.clone().detach()
 
         structure: dict = self.trunk(s_s_0, s_z_0, aa, residx, mask, no_recycles=num_recycles)
         # Documenting what we expect:
@@ -262,9 +269,9 @@ class ESMFold(nn.Module):
         #     ]
         # )
         # structure.update(compute_predicted_aligned_error(ptm_logits, max_bin=31, no_bins=self.distogram_bins))
-        
+
         # DEBUG: Intermediate results
-        structure.update({"esm_s": esm_s.float(), "esm_z": esm_z.float()})
+        structure.update(intermediates)
 
         return structure
 
@@ -371,4 +378,4 @@ class ESMFold(nn.Module):
             self.esm.num_layers,
             self.trunk.cfg.position_bins,
             self.trunk.recycle_bins,
-        ], dirpath / "config.txt")
+        ], dirpath / "adaptor" / "config.txt")
