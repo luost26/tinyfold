@@ -6,28 +6,10 @@
 #include <cmath>
 #include "../matrix.h"
 #include "linear.h"
+#include "geometric.h"
 
 const float INF = 1e5f;
 const float EPS = 1e-8f;
-
-inline void apply_affine(const float * affine_4x4, const float * vec3, float * out3) {
-    float x = affine_4x4[0] * vec3[0] + affine_4x4[1] * vec3[1] + affine_4x4[2] * vec3[2] + affine_4x4[3];
-    float y = affine_4x4[4] * vec3[0] + affine_4x4[5] * vec3[1] + affine_4x4[6] * vec3[2] + affine_4x4[7];
-    float z = affine_4x4[8] * vec3[0] + affine_4x4[9] * vec3[1] + affine_4x4[10] * vec3[2] + affine_4x4[11];
-    out3[0] = x;
-    out3[1] = y;
-    out3[2] = z;
-}
-
-
-inline void invert_apply_affine(const float * affine_4x4, const float * vec3, float * out3) {
-    float x = vec3[0] - affine_4x4[3];
-    float y = vec3[1] - affine_4x4[7];
-    float z = vec3[2] - affine_4x4[11];
-    out3[0] = affine_4x4[0] * x + affine_4x4[4] * y + affine_4x4[8] * z;
-    out3[1] = affine_4x4[1] * x + affine_4x4[5] * y + affine_4x4[9] * z;
-    out3[2] = affine_4x4[2] * x + affine_4x4[6] * y + affine_4x4[10] * z;
-}
 
 
 inline void qk_inner_product_accumulate(const matrix<float> &query, const matrix<float> &key, float scale_factor, matrix<float> &out) {
