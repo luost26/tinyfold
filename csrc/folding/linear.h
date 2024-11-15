@@ -1,6 +1,7 @@
 #ifndef FOLDING_LINEAR_H
 #define FOLDING_LINEAR_H
 
+#include <omp.h>
 #include "../matrix.h"
 
 template <ActivationType act_type = None, typename T>
@@ -31,6 +32,42 @@ void linear_residual(const matrix<T> &in, const matrix<T> &weight, matrix<T> &ou
     matmul<true, true, false>(in, weight, out);
 }
 
+template <ActivationType act_type = None, typename T>
+void linear_(matrix<T> &x, const matrix<T> &weight, const matrix<T> &bias) {
+    // in: (batch, channels)
+    // weight: (channels, channels)
+    // bias: (channels, 1)
+    int bsz = x.n_rows;
+    int channels = x.n_cols;
+    if (weight.n_rows != channels || weight.n_cols != channels) {
+        std::cerr << "linear_: weight shape mismatch, and the channels of input and output must be the same" << std::endl;
+        exit(1);
+    }
+
+    int num_threads = omp_get_max_threads();
+    std::cerr << "num_threads: " << num_threads << std::endl;
+    T * buffer_all = new T[num_threads * channels];
+
+    #pragma omp parallel for
+    for (int i = 0; i < bsz; i ++) {
+        int thread_idx = omp_get_thread_num();
+        T * buffer = buffer_all + thread_idx * channels;
+        for (int j = 0; j < channels; j ++) {
+            buffer[j] = *bias(j, 0);
+            for (int k = 0; k < channels; k ++) {
+                buffer[j] += *x(i, k) * *weight(j, k);
+            }
+            if (act_type == ReLU) {
+                buffer[j] = buffer[j] > 0 ? buffer[j] : 0;
+            }
+        }
+        for (int j = 0; j < channels; j ++) {
+            *x(i, j) = buffer[j];
+        }
+    }
+
+    delete[] buffer_all;
+}
 
 template <typename T>
 void layer_norm(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias, matrix<T> &out) {
@@ -38,6 +75,8 @@ void layer_norm(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &b
     // weight: (in_channels, 1)
     // bias: (in_channels, 1)
     // out: (batch, in_channels)
+    
+    #pragma omp parallel for
     for (int i = 0; i < in.n_rows; i ++) {
         T sum = 0;
         for (int j = 0; j < in.n_cols; j ++) {
@@ -57,7 +96,7 @@ void layer_norm(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &b
     }
 }
 
-template <typename T>
+template <ActivationType act_type = None, typename T>
 void fused_layer_norm_linear(const matrix<T> &in, const matrix<T> &norm_weight, const matrix<T> &norm_bias, const matrix<T> &linear_weight, const matrix<T> &linear_bias, matrix<T> &out) {
     // in: (batch, in_channels)
     // weight: (out_channels, in_channels)
@@ -69,6 +108,7 @@ void fused_layer_norm_linear(const matrix<T> &in, const matrix<T> &norm_weight, 
     int in_channels = in.n_cols;
     int out_channels = out.n_cols;
 
+    #pragma omp parallel for
     for (int i = 0; i < bsz; i ++) {
         T mean = 0;
         for (int j = 0; j < in_channels; j ++) {
@@ -85,13 +125,16 @@ void fused_layer_norm_linear(const matrix<T> &in, const matrix<T> &norm_weight, 
         T inv_std = 1.0f / sqrt(var + 1e-5f);
 
         for (int j = 0; j < out_channels; j ++) {
-            T sum = 0;
+            T sum = *linear_bias(j, 0);
             for (int k = 0; k < in_channels; k ++) {
                 sum += (
                     (*in(i, k) - mean) * inv_std * *norm_weight(k, 0) + *norm_bias(k, 0)
                 ) * *linear_weight(j, k);
             }
-            *out(i, j) = sum + *linear_bias(j, 0);
+            if (act_type == ReLU) {
+                sum = sum > 0 ? sum : 0;
+            }
+            *out(i, j) = sum;
         }
     }
     

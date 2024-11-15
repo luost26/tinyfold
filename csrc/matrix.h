@@ -80,6 +80,7 @@ void matmul(const matrix<T> &A, const matrix<T> &B, matrix<T> &C)
         exit(1);
     }
 
+    #pragma omp parallel for
     for (int i = 0; i < C.n_rows; i++)
     {
         for (int j = 0; j < C.n_cols; j++)
@@ -146,6 +147,7 @@ void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, m
         }
     }
 
+    #pragma omp parallel for
     for (int i = 0; i < C.n_rows; i++)
     {
         for (int j = 0; j < C.n_cols; j++)
@@ -273,17 +275,39 @@ void load_(matrix<T> & A, const std::string & path) {
 template <typename T>
 std::ostream& operator<<(std::ostream &os, const matrix<T> &A)
 {
+
+    #define PRINT_ROW_ELEMENTS(MAT,ROW,LOW,UP) { \
+        for (int j = LOW; j < UP; j++) { \
+            os << *MAT(ROW, j); \
+            if (j < UP - 1) os << " "; \
+        } \
+    }
+
+    #define PRINT_ROW(MAT,ROW,NUM_COLS) { \
+        os << "["; \
+        if (NUM_COLS <= 10) { \
+            PRINT_ROW_ELEMENTS(MAT,ROW,0,NUM_COLS); \
+        } else { \
+            PRINT_ROW_ELEMENTS(MAT,ROW,0,5); \
+            os << "... "; \
+            PRINT_ROW_ELEMENTS(MAT,ROW,NUM_COLS-5,NUM_COLS); \
+        } \
+        os << "]\n"; \
+    }
+
     os << "[";
-    for (int i = 0; i < A.n_rows; i++)
-    {
-        os << "[";
-        for (int j = 0; j < A.n_cols; j++)
-        {
-            os << *A(i, j);
-            if (j < A.n_cols - 1) os << " ";
+    if (A.n_rows <= 10) {
+        for (int i = 0; i < A.n_rows; i++) {
+            PRINT_ROW(A,i,A.n_cols);
         }
-        os << "]";
-        if (i < A.n_rows - 1) os << "\n";
+    } else {
+        for (int i = 0; i < 5; i++) {
+            PRINT_ROW(A,i,A.n_cols);
+        }
+        os << "...\n";
+        for (int i = A.n_rows-5; i < A.n_rows; i++) {
+            PRINT_ROW(A,i,A.n_cols);
+        }
     }
     os << ", size=(" << A.n_rows << ", " << A.n_cols << ")]\n";
     return os;
