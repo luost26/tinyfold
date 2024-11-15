@@ -33,7 +33,7 @@ void linear_residual(const matrix<T> &in, const matrix<T> &weight, matrix<T> &ou
 }
 
 template <ActivationType act_type = None, typename T>
-void linear_(matrix<T> &x, const matrix<T> &weight, const matrix<T> &bias) {
+void linear_(matrix<T> &x, const matrix<T> &weight, const matrix<T> &bias, matrix<T> * inplace_linear_buffer_ptr = nullptr) {
     // in: (batch, channels)
     // weight: (channels, channels)
     // bias: (channels, 1)
@@ -44,9 +44,16 @@ void linear_(matrix<T> &x, const matrix<T> &weight, const matrix<T> &bias) {
         exit(1);
     }
 
-    int num_threads = omp_get_max_threads();
-    std::cerr << "num_threads: " << num_threads << std::endl;
-    T * buffer_all = new T[num_threads * channels];
+    bool buffer_owned = false;
+    T * buffer_all = nullptr;
+    if (inplace_linear_buffer_ptr == nullptr) {
+        int num_threads = omp_get_max_threads();
+        std::cerr << "num_threads: " << num_threads << std::endl;
+        buffer_all = new T[num_threads * channels];
+        buffer_owned = true;
+    } else {
+        buffer_all = inplace_linear_buffer_ptr->data;
+    }
 
     #pragma omp parallel for
     for (int i = 0; i < bsz; i ++) {
@@ -67,7 +74,9 @@ void linear_(matrix<T> &x, const matrix<T> &weight, const matrix<T> &bias) {
         }
     }
 
-    delete[] buffer_all;
+    if (buffer_owned) {
+        delete buffer_all;
+    }
 }
 
 template <typename T>

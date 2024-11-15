@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <omp.h>
 #include "../matrix.h"
 #include "linear.h"
 
@@ -38,12 +39,17 @@ struct AdaptorBuffer {
 
     matrix<float> sm_s;
 
+    matrix<float> s_inplace_buffer;
+    matrix<float> z_inplace_buffer;
+
     AdaptorBuffer(int seqlen, const AdaptorConfig &cfg):
         seqlen(seqlen),
         cfg(cfg),
         s(seqlen, cfg.c_s),
         z(seqlen * seqlen, cfg.c_z),
-        sm_s(seqlen, cfg.sm_c_s)
+        sm_s(seqlen, cfg.sm_c_s),
+        s_inplace_buffer(omp_get_max_threads(), cfg.c_s),
+        z_inplace_buffer(omp_get_max_threads(), cfg.c_z)
     {}
 };
 
@@ -149,7 +155,7 @@ struct Adaptor {
         // esm_s_mlp
         std::cerr << "Running esm_s_mlp" << std::endl;
         fused_layer_norm_linear<ReLU>(esm_s, esm_s_mlp_0_layernorm_weight, esm_s_mlp_0_layernorm_bias, esm_s_mlp_1_linear_weight, esm_s_mlp_1_linear_bias, buffer.s);
-        linear_(buffer.s, esm_s_mlp_3_linear_weight, esm_s_mlp_3_linear_bias);
+        linear_(buffer.s, esm_s_mlp_3_linear_weight, esm_s_mlp_3_linear_bias, &buffer.s_inplace_buffer);
         #pragma omp parallel for
         for (int i = 0; i < buffer.s.n_rows; i ++) {
             for (int j = 0; j < buffer.s.n_cols; j ++) {
@@ -160,7 +166,7 @@ struct Adaptor {
         // esm_z_mlp
         std::cerr << "Running esm_z_mlp" << std::endl;
         fused_layer_norm_linear<ReLU>(esm_z, esm_z_mlp_0_layernorm_weight, esm_z_mlp_0_layernorm_bias, esm_z_mlp_1_linear_weight, esm_z_mlp_1_linear_bias, buffer.z);
-        linear_(buffer.z, esm_z_mlp_3_linear_weight, esm_z_mlp_3_linear_bias);
+        linear_(buffer.z, esm_z_mlp_3_linear_weight, esm_z_mlp_3_linear_bias, &buffer.z_inplace_buffer);
 
         // No recycling
         for (int i = 0; i < buffer.s.n_rows; i ++) {
@@ -186,7 +192,7 @@ struct Adaptor {
                 *buffer.z(i, j) += *trunk_recycle_z_norm_bias(j, 0) + *trunk_recycle_disto_weight(0, j) + *trunk_pairwise_positional_embedding(rpe_idx, j);
             }
         }
-        linear_(buffer.z, trunk_trunk2sm_z_weight, trunk_trunk2sm_z_bias);
+        linear_(buffer.z, trunk_trunk2sm_z_weight, trunk_trunk2sm_z_bias, &buffer.z_inplace_buffer);
     }
 };
 
