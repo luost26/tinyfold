@@ -77,7 +77,6 @@ struct TransformerBuffer {
 
     matrix<float> q;
     matrix<float> k;
-    matrix<float> v;
     matrix<float> attn_weights;
 
     TransformerBuffer(int seqlen, const TransformerConfig &cfg):
@@ -86,7 +85,6 @@ struct TransformerBuffer {
         x(seqlen, cfg.embed_dim),
         q(cfg.num_heads * seqlen, cfg.head_dim()),
         k(cfg.num_heads * seqlen, cfg.head_dim()),
-        v(cfg.num_heads * seqlen, cfg.head_dim()),
         attn_weights(cfg.num_heads * seqlen, seqlen)
     {}
 };
@@ -166,9 +164,14 @@ struct TransformerLayer {
         layer_norm(x, self_attn_layer_norm_weight, self_attn_layer_norm_bias, buffer.x);
         attn_proj_linear(buffer.x, q_proj_weight, q_proj_bias, buffer.q);
         attn_proj_linear(buffer.x, k_proj_weight, k_proj_bias, buffer.k);
-        attn_proj_linear(buffer.x, v_proj_weight, v_proj_bias, buffer.v);
         apply_rotary_embedding_(buffer.q, cfg.num_heads);
         apply_rotary_embedding_(buffer.k, cfg.num_heads);
+        bmm<true>(buffer.q, buffer.k, buffer.attn_weights);
+        softmax_(buffer.attn_weights);
+
+        attn_proj_linear(buffer.x, v_proj_weight, v_proj_bias, buffer.k);  // Use k buffer to save memory
+        bmm(buffer.attn_weights, buffer.k, buffer.q);  // Use q buffer to save memory
+        attn_out_linear(buffer.q, out_proj_weight, out_proj_bias, buffer.x);
     }
 };
 

@@ -22,9 +22,11 @@ void test_transformer() {
         auto NAME##_ref = matrix<float>(dirpath + "/output/" #OUTNAME ".bin", buffer->NAME.n_rows, buffer->NAME.n_cols); \
         TEST_ALLCLOSE(#NAME, buffer->NAME, NAME##_ref, ATOL); \
     }
-    TEST_INTERMEDIATE_ALLCLOSE(q, q_rot, 1e-6f);
-    TEST_INTERMEDIATE_ALLCLOSE(k, k_rot, 1e-6f);
-    TEST_INTERMEDIATE_ALLCLOSE(v, v, 1e-6f);
+    // TEST_INTERMEDIATE_ALLCLOSE(q, q_rot, 1e-6f);
+    // TEST_INTERMEDIATE_ALLCLOSE(k, k_rot, 1e-6f);
+    // TEST_INTERMEDIATE_ALLCLOSE(v, v, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(attn_weights, attn_weights, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(x, attn, 1e-6f);
     #undef TEST_INTERMEDIATE_ALLCLOSE
 }
 

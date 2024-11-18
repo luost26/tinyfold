@@ -239,6 +239,8 @@ class MultiheadAttention(nn.Module):
 
         attn = attn.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
         attn = self.out_proj(attn)
+        if return_intermediates:
+            intermediates["attn"] = attn.clone().detach()
         attn_weights: Tensor | None = None
         if need_weights:
             attn_weights = attn_weights_float.view(bsz, self.num_heads, tgt_len, src_len).type_as(attn).transpose(1, 0)

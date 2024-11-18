@@ -174,4 +174,30 @@ void attn_proj_linear(const matrix<T> &in, const matrix<T> &weight, const matrix
     }
 }
 
+template <typename T>
+void attn_out_linear(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias, matrix<T> &out) {
+    // in: (num_heads * seqlen, head_dim)
+    // weight: (out_dim, num_heads * head_dim)
+    // bias: (out_dim, 1)
+    // out: (seqlen, out_dim)
+    const int head_dim = in.n_cols;
+    const int out_dim = weight.n_rows;
+    const int seqlen = out.n_rows;
+    const int num_heads = in.n_rows / seqlen;
+
+    #pragma omp parallel for
+    for (int i = 0; i < seqlen; i ++) {
+        for (int j =0; j < out_dim; j ++) {
+            T sum = *bias(j, 0);
+            for (int k = 0; k < num_heads * head_dim; k ++) {
+                const int head_idx = k / head_dim;
+                const int dim_idx = k % head_dim;
+                sum += *in(head_idx * seqlen + i, dim_idx) * *weight(j, k);
+            }
+            *out(i, j) = sum;
+        }
+    }
+
+}
+
 #endif // FOLDING_LINEAR_H
