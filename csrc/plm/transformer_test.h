@@ -18,13 +18,13 @@ void test_transformer() {
 
     (*transformer)(x, *buffer);
 
-    #define TEST_INTERMEDIATE_ALLCLOSE(NAME,ATOL) { \
-        auto NAME##_ref = matrix<float>(dirpath + "/output/" #NAME ".bin", buffer->NAME.n_rows, buffer->NAME.n_cols); \
+    #define TEST_INTERMEDIATE_ALLCLOSE(NAME,OUTNAME,ATOL) { \
+        auto NAME##_ref = matrix<float>(dirpath + "/output/" #OUTNAME ".bin", buffer->NAME.n_rows, buffer->NAME.n_cols); \
         TEST_ALLCLOSE(#NAME, buffer->NAME, NAME##_ref, ATOL); \
     }
-    TEST_INTERMEDIATE_ALLCLOSE(q, 1e-6f);
-    TEST_INTERMEDIATE_ALLCLOSE(k, 1e-6f);
-    TEST_INTERMEDIATE_ALLCLOSE(v, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(q, q_rot, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(k, k_rot, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(v, v, 1e-6f);
     #undef TEST_INTERMEDIATE_ALLCLOSE
 }
 

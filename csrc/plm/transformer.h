@@ -6,6 +6,38 @@
 #include "../matrix.h"
 #include "../linear.h"
 
+
+inline float rotary_angle(int s, int d, int dim) {
+    const float inv_freq = 1.0f / powf(10000.0f, (float)((d * 2) % dim) / (float)dim);
+    const float angle = (float)s * inv_freq;
+    return angle;
+}
+
+inline void apply_rotary_embedding_(matrix<float> &x, int num_heads) {
+    const int dim = x.n_cols;
+    const int seqlen = x.n_rows / num_heads;
+    const int half_dim = dim / 2;
+    #pragma omp parallel for
+    for (int i = 0; i < num_heads * seqlen; ++i) {
+        const int head_idx = i / seqlen;
+        const int seq_idx = i % seqlen;
+        for (int j = 0; j < half_dim; j ++) {
+            float angle_lo = rotary_angle(seq_idx, j, dim);
+            float c_lo = cosf(angle_lo);
+            float s_lo = sinf(angle_lo);
+            float x_lo = *x(i, j) * c_lo - *x(i, j + half_dim) * s_lo;
+
+            float angle_hi = rotary_angle(seq_idx, j + half_dim, dim);
+            float c_hi = cosf(angle_hi);
+            float s_hi = sinf(angle_hi);
+            float x_hi = *x(i, j + half_dim) * c_hi + *x(i, j) * s_hi;
+
+            *x(i, j) = x_lo;
+            *x(i, j + half_dim) = x_hi;
+        }
+    }
+}
+
 struct TransformerConfig {
     int embed_dim;
     int num_heads;
@@ -126,11 +158,17 @@ struct TransformerLayer {
         return new TransformerBuffer(seqlen, cfg);
     }
 
+    void apply_rotary_embedding() {
+
+    }
+
     void operator() (const matrix<float> &x, TransformerBuffer &buffer) {
         layer_norm(x, self_attn_layer_norm_weight, self_attn_layer_norm_bias, buffer.x);
         attn_proj_linear(buffer.x, q_proj_weight, q_proj_bias, buffer.q);
         attn_proj_linear(buffer.x, k_proj_weight, k_proj_bias, buffer.k);
         attn_proj_linear(buffer.x, v_proj_weight, v_proj_bias, buffer.v);
+        apply_rotary_embedding_(buffer.q, cfg.num_heads);
+        apply_rotary_embedding_(buffer.k, cfg.num_heads);
     }
 };
 
