@@ -3,6 +3,7 @@ project(folddotc)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_FLAGS "-O3 -funroll-loops")
 
 set(PROJECT_SOURCE_DIR ${CMAKE_SOURCE_DIR}/csrc)
 
