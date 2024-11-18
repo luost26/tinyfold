@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from efficient_esm.models.structure_module import InvariantPointAttention, Rigid, StructureModule
 from efficient_esm.models.esmfold import ESMFold
+from efficient_esm.models.transformer import TransformerLayer
 from efficient_esm.utils.export import export_tensor_dict
 
 torch.set_grad_enabled(False)
@@ -83,6 +84,8 @@ def esmfold_folding_only():
     print("Generating test data")
     seq = "ASAWPEEKNYHQPAILNSSALRQIAEGTSISEMWQNDLQPLLIERYPGSPGSYAARQHIMQRIQRLQADWVLEIDTFLSQTPYGYRSFSNIISTLNPTAKRHLVLACHYDSKYFSHWNNRVFVGATDS"  # noqa
     out = model.infer(seq)
+    with open("./data/c_test/esmfold_folding_only/out.pdb", "w") as f:
+        f.writelines(model.output_to_pdb(out))
     plddt = out["mean_plddt"].item()
     print(f"pLDDT: {plddt:.2f}")
 
@@ -91,6 +94,24 @@ def esmfold_folding_only():
         Path("./data/c_test/esmfold_folding_only") / "input",
     )
     export_tensor_dict(out, Path("./data/c_test/esmfold_folding_only") / "output")
+
+
+def transformer():
+    torch.manual_seed(0)
+    random.seed(0)
+    seqlen = 17
+
+    output_dir = Path("./data/c_test/transformer")
+    module = TransformerLayer(32, 64, 4, True)
+    x = torch.randn([1, seqlen, 32])
+    y, attn_map, intermediates = module(x.transpose(0, 1).contiguous(), return_intermediates=True)
+
+    module.export(output_dir)
+    export_tensor_dict({"x": x}, output_dir / "input")
+    outs = {"out": y, "out_attn_map": attn_map, **intermediates}
+    export_tensor_dict(outs, output_dir / "output")
+    for k, v in outs.items():
+        print(f"{k}: {v.shape}")
 
 
 if __name__ == "__main__":

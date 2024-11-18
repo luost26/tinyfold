@@ -1,9 +1,12 @@
 # mypy: ignore-errors
 import math
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
+
+from efficient_esm.utils.export import export_tensor_dict, export_value_list
 
 
 def rotate_half(x):
@@ -142,6 +145,7 @@ class MultiheadAttention(nn.Module):
         need_weights: bool = True,
         attn_mask: Tensor | None = None,
         need_head_weights: bool = False,
+        return_intermediates: bool = False,
     ) -> tuple[Tensor, Tensor | None]:
         """Input shape: Time x Batch x Channel
 
@@ -163,6 +167,8 @@ class MultiheadAttention(nn.Module):
         if need_head_weights:
             need_weights = True
 
+        intermediates: dict[str, torch.Tensor] = {}
+
         tgt_len, bsz, embed_dim = query.size()
         assert embed_dim == self.embed_dim
         assert list(query.size()) == [tgt_len, bsz, embed_dim]
@@ -179,6 +185,11 @@ class MultiheadAttention(nn.Module):
         if v is not None:
             v = v.contiguous().view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
 
+        if return_intermediates:
+            intermediates["q"] = q.clone().detach()
+            intermediates["k"] = k.clone().detach()
+            intermediates["v"] = v.clone().detach()
+
         src_len = k.size(1)
 
         # This is part of a workaround to get around fork/join parallelism
@@ -192,6 +203,9 @@ class MultiheadAttention(nn.Module):
 
         if self.rot_emb:
             q, k = self.rot_emb(q, k)
+            if return_intermediates:
+                intermediates["q_rot"] = q.clone().detach()
+                intermediates["k_rot"] = k.clone().detach()
 
         attn_weights = torch.bmm(q, k.transpose(1, 2))
         attn_weights = MultiheadAttention.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
@@ -212,6 +226,8 @@ class MultiheadAttention(nn.Module):
 
         attn_weights_float = utils_softmax(attn_weights, dim=-1)
         attn_weights = attn_weights_float.type_as(attn_weights)
+        if return_intermediates:
+            intermediates["attn_weights"] = attn_weights.clone().detach()
         attn_probs = F.dropout(
             attn_weights_float.type_as(attn_weights),
             p=self.dropout,
@@ -230,7 +246,7 @@ class MultiheadAttention(nn.Module):
                 # average attention weights over heads
                 attn_weights = attn_weights.mean(dim=0)
 
-        return attn, attn_weights
+        return attn, attn_weights, intermediates
 
     def apply_sparse_mask(attn_weights, tgt_len: int, src_len: int, bsz: int):
         return attn_weights
@@ -274,10 +290,17 @@ class TransformerLayer(nn.Module):
 
         self.final_layer_norm = nn.LayerNorm(self.embed_dim)
 
-    def forward(self, x, self_attn_mask=None, self_attn_padding_mask=None, need_head_weights=False):
+    def forward(
+        self,
+        x,
+        self_attn_mask=None,
+        self_attn_padding_mask=None,
+        need_head_weights=False,
+        return_intermediates=False,
+    ):
         residual = x
         x = self.self_attn_layer_norm(x)
-        x, attn = self.self_attn(
+        x, attn, intermediates = self.self_attn(
             query=x,
             key=x,
             value=x,
@@ -285,6 +308,7 @@ class TransformerLayer(nn.Module):
             need_weights=True,
             need_head_weights=need_head_weights,
             attn_mask=self_attn_mask,
+            return_intermediates=return_intermediates,
         )
         x = residual + x
 
@@ -294,4 +318,22 @@ class TransformerLayer(nn.Module):
         x = self.fc2(x)
         x = residual + x
 
-        return x, attn
+        if return_intermediates:
+            return x, attn, intermediates
+        else:
+            return x, attn
+
+    def export(self, dirpath: str | Path) -> None:
+        dirpath = Path(dirpath)
+        export_tensor_dict(self.state_dict(), dirpath)
+        torch.save(self.state_dict(), dirpath / "state_dict.pt")
+        export_value_list(
+            [
+                self.embed_dim,
+                self.attention_heads,
+                self.embed_dim,  # kdim
+                self.embed_dim,  # vdim
+                self.ffn_embed_dim,
+            ],
+            dirpath / "config.txt",
+        )
