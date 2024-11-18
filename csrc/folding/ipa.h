@@ -5,7 +5,7 @@
 #include <fstream>
 #include <cmath>
 #include "../matrix.h"
-#include "linear.h"
+#include "../linear.h"
 #include "geometric.h"
 
 const float INF = 1e5f;
@@ -399,7 +399,7 @@ struct InvariantPointAttention
     }
 };
 
-InvariantPointAttention * load_invariant_point_attention(std::string dirpath)
+InvariantPointAttention * load_invariant_point_attention(const std::string &dirpath)
 {
     IPAConfig cfg(dirpath + "/config.txt");
     return new InvariantPointAttention(cfg, dirpath);

@@ -2,10 +2,10 @@
 #define FOLDING_LINEAR_H
 
 #include <omp.h>
-#include "../matrix.h"
+#include "matrix.h"
 
 template <ActivationType act_type = None, typename T>
-void linear(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias, matrix<T> &out) {
+inline void linear(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias, matrix<T> &out) {
     // in: (batch, in_channels)
     // weight: (out_channels, in_channels)
     // bias: (out_channels, 1)
@@ -14,12 +14,12 @@ void linear(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias,
 }
 
 template <ActivationType act_type = None, typename T>
-void linear(const matrix<T> &in, const matrix<T> &weight, matrix<T> &out) {
+inline void linear(const matrix<T> &in, const matrix<T> &weight, matrix<T> &out) {
     matmul<true, false, false, act_type>(in, weight, out);
 }
 
 template <typename T>
-void linear_residual(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias, matrix<T> &out) {
+inline void linear_residual(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias, matrix<T> &out) {
     // in: (batch, in_channels)
     // weight: (out_channels, in_channels)
     // bias: (out_channels, 1)
@@ -28,7 +28,7 @@ void linear_residual(const matrix<T> &in, const matrix<T> &weight, const matrix<
 }
 
 template <typename T>
-void linear_residual(const matrix<T> &in, const matrix<T> &weight, matrix<T> &out) {
+inline void linear_residual(const matrix<T> &in, const matrix<T> &weight, matrix<T> &out) {
     matmul<true, true, false>(in, weight, out);
 }
 
@@ -148,6 +148,30 @@ void fused_layer_norm_linear(const matrix<T> &in, const matrix<T> &norm_weight, 
         }
     }
     
+}
+
+template <typename T>
+void attn_proj_linear(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias, matrix<T> &out) {
+    // in: (seqlen, in_dim)
+    // weight: (num_heads * head_dim, in_dim)
+    // bias: (num_heads * head_dim, 1)
+    // out: (num_heads * seqlen, head_dim)
+    int seqlen = in.n_rows;
+    int in_dim = in.n_cols;
+    int head_dim = out.n_cols;
+    int num_heads = out.n_rows / seqlen;
+    #pragma omp parallel for
+    for (int i = 0; i < num_heads * seqlen; i ++) {
+        const int head_idx = i / seqlen;
+        const int seq_idx = i % seqlen;
+        for (int j = 0; j < head_dim; j ++) {
+            T sum = *bias(head_idx * head_dim + j, 0);
+            for (int k = 0; k < in_dim; k ++) {
+                sum += *in(seq_idx, k) * *weight(head_idx * head_dim + j, k);
+            }
+            *out(head_idx * seqlen + seq_idx, j) = sum;
+        }
+    }
 }
 
 #endif // FOLDING_LINEAR_H

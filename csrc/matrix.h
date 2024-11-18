@@ -186,6 +186,36 @@ void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, m
 
 
 template <typename T>
+void bmm(const matrix<T> &A, const matrix<T> &B_tr, matrix<T> &C) {
+    // A:    (bsz * N, K)
+    // B_tr: (bsz * M, K)
+    // C:    (bsz * N, M)
+    if (&A == &C || &B_tr == &C)
+    {
+        std::cerr << "Matrix multiplication cannot be done inplace" << std::endl;
+        exit(1);
+    }
+    const int M = C.n_cols;
+    const int bsz = B_tr.n_rows / M;
+    const int N = A.n_rows / bsz;
+    const int K = A.n_cols;
+
+    #pragma omp parallel for
+    for (int i = 0; i < bsz * N; i ++) { 
+        const int batch_idx = i / N;
+        const int n_idx = i % N;
+        for (int j = 0; j < bsz * M; j ++) {
+            T sum = 0;
+            for (int k = 0; k < K; k ++) {
+                sum += *A(i, k) * *B_tr(batch_idx * M + j, k);
+            }
+            *C(i, j) = sum;
+        }
+    }
+}
+
+
+template <typename T>
 void softmax_(matrix<T> &A) {
     for (int i = 0; i < A.n_rows; i++) {
         T max_val = *A(i, 0);
@@ -243,6 +273,16 @@ inline void sub_(matrix<T> &A, const matrix<T> &B) {
 
 
 template <typename T>
+inline void mul_(matrix<T> &A, T b) {
+    for (int i = 0; i < A.n_rows; i++) {
+        for (int j = 0; j < A.n_cols; j++) {
+            *A(i, j) *= b;
+        }
+    }
+}
+
+
+template <typename T>
 inline bool allclose(const matrix<T> &A, const matrix<T> &B, T atol = 1e-6, T * error_output = nullptr) {
     if (A.n_rows != B.n_rows || A.n_cols != B.n_cols) {
         return false;
@@ -269,7 +309,7 @@ void load_(matrix<T> & A, const std::string & path) {
         std::cerr << "Cannot open file " << path << std::endl;
         exit(1);
     }
-    fread(A.data, sizeof(T), A.n_rows * A.n_cols, f);
+    std::ignore = fread(A.data, sizeof(T), A.n_rows * A.n_cols, f);
 }
 
 

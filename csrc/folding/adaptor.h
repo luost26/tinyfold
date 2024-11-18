@@ -5,7 +5,7 @@
 #include <fstream>
 #include <omp.h>
 #include "../matrix.h"
-#include "linear.h"
+#include "../linear.h"
 
 struct AdaptorConfig {
     int c_s;
