@@ -103,6 +103,7 @@ def transformer():
 
     output_dir = Path("./data/c_test/transformer")
     module = TransformerLayer(32, 64, 4, True)
+    module.eval()
     x = torch.randn([1, seqlen, 32])
     y, attn_map, intermediates = module(x.transpose(0, 1).contiguous(), return_intermediates=True)
 
