@@ -313,10 +313,14 @@ class TransformerLayer(nn.Module):
             return_intermediates=return_intermediates,
         )
         x = residual + x
+        if return_intermediates:
+            intermediates["self_attn_plus_residual"] = x.clone().detach()
 
         residual = x
         x = self.final_layer_norm(x)
         x = gelu(self.fc1(x))
+        if return_intermediates:
+            intermediates["out_fc1"] = x.clone().detach()
         x = self.fc2(x)
         x = residual + x
 

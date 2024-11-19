@@ -105,7 +105,9 @@ void matmul(const matrix<T> &A, const matrix<T> &B, matrix<T> &C)
 }
 
 
-enum ActivationType {None, ReLU};
+enum ActivationType {None, ReLU, GELU};
+
+const float SQRT2 = sqrtf(2.0f);
 
 
 template <bool transposed_B = false, bool is_bias_vector = false, bool residual = false, ActivationType act_type = None, typename T>
@@ -173,6 +175,8 @@ void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, m
             }
             if (act_type == ReLU) {
                 sum = std::max((T)0, sum);
+            } else if (act_type == GELU) {
+                sum = sum * 0.5 * (1.0 + erf(sum / SQRT2));
             }
 
             if (residual) {

@@ -26,7 +26,8 @@ void test_transformer() {
     // TEST_INTERMEDIATE_ALLCLOSE(k, k_rot, 1e-6f);
     // TEST_INTERMEDIATE_ALLCLOSE(v, v, 1e-6f);
     TEST_INTERMEDIATE_ALLCLOSE(attn_weights, attn_weights, 1e-6f);
-    TEST_INTERMEDIATE_ALLCLOSE(x, attn, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(x1, out_fc1, 1e-6f);
+    TEST_INTERMEDIATE_ALLCLOSE(x, out, 1e-6f);
     #undef TEST_INTERMEDIATE_ALLCLOSE
 }
 

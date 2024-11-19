@@ -143,6 +143,8 @@ void fused_layer_norm_linear(const matrix<T> &in, const matrix<T> &norm_weight, 
             }
             if (act_type == ReLU) {
                 sum = sum > 0 ? sum : 0;
+            } else if (act_type == GELU) {
+                sum = sum * 0.5 * (1.0 + erf(sum / SQRT2));
             }
             *out(i, j) = sum;
         }

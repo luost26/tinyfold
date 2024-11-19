@@ -78,6 +78,7 @@ struct TransformerBuffer {
     matrix<float> q;
     matrix<float> k;
     matrix<float> attn_weights;
+    matrix<float> x1;
 
     TransformerBuffer(int seqlen, const TransformerConfig &cfg):
         seqlen(seqlen),
@@ -85,7 +86,8 @@ struct TransformerBuffer {
         x(seqlen, cfg.embed_dim),
         q(cfg.num_heads * seqlen, cfg.head_dim()),
         k(cfg.num_heads * seqlen, cfg.head_dim()),
-        attn_weights(cfg.num_heads * seqlen, seqlen)
+        attn_weights(cfg.num_heads * seqlen, seqlen),
+        x1(seqlen, cfg.ffn_embed_dim)
     {}
 };
 
@@ -123,12 +125,12 @@ struct TransformerLayer {
         q_proj_bias(cfg.embed_dim, 1),
         out_proj_weight(cfg.embed_dim, cfg.embed_dim),
         out_proj_bias(cfg.embed_dim, 1),
+        final_layer_norm_weight(cfg.embed_dim, 1),
+        final_layer_norm_bias(cfg.embed_dim, 1),
         fc1_weight(cfg.ffn_embed_dim, cfg.embed_dim),
         fc1_bias(cfg.ffn_embed_dim, 1),
         fc2_weight(cfg.embed_dim, cfg.ffn_embed_dim),
-        fc2_bias(cfg.embed_dim, 1),
-        final_layer_norm_weight(cfg.embed_dim, 1),
-        final_layer_norm_bias(cfg.embed_dim, 1)
+        fc2_bias(cfg.embed_dim, 1)
     {
         std::cerr << "Loading weights for TransformerLayer from " << dirpath << std::endl;
         load_(self_attn_layer_norm_weight, dirpath + "/self_attn_layer_norm.weight.bin");
@@ -172,6 +174,10 @@ struct TransformerLayer {
         attn_proj_linear(buffer.x, v_proj_weight, v_proj_bias, buffer.k);  // Use k buffer to save memory
         bmm(buffer.attn_weights, buffer.k, buffer.q);  // Use q buffer to save memory
         attn_out_linear(buffer.q, out_proj_weight, out_proj_bias, buffer.x);
+        add_(buffer.x, x);
+
+        fused_layer_norm_linear<GELU>(buffer.x, final_layer_norm_weight, final_layer_norm_bias, fc1_weight, fc1_bias, buffer.x1);
+        linear_residual(buffer.x1, fc2_weight, fc2_bias, buffer.x);
     }
 };
 
