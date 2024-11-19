@@ -103,6 +103,8 @@ def to_pdb(prot: Protein) -> str:
     for i in range(n):
         res_name_3 = res_1to3(aatype[i])
         for atom_name, pos, mask, b_factor in zip(atom_types, atom_positions[i], atom_mask[i], b_factors[i]):
+            if atom_name.strip() not in ["N", "CA", "C", "O"]:
+                continue
             if mask < 0.5:
                 continue
 
