@@ -26,7 +26,7 @@ struct TinyFold {
         int seqlen = esm_aatype.n_rows;
         std::unique_ptr<ESMBuffer> buffer(esm->create_buffer(esm_aatype));
         ESMRepresentation repr_out(seqlen, esm->cfg, *esm_s_combine_normalized);
-        (*esm)(esm_aatype, *buffer, &repr_out, esm->cfg.num_layers);
+        (*esm)(esm_aatype, *buffer, &repr_out);
 
         matrix<int> folding_aatype = tokenize_folding_aatype(seq);
         matrix<int> residx = make_residx(seqlen);
