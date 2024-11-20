@@ -120,16 +120,25 @@ def esm_small():
     torch.manual_seed(0)
     random.seed(0)
     seqlen = 17
-    seq = [1] + [random.randint(4, 24) for _ in range(seqlen - 2)] + [2]
+    seq = [0] + [random.randint(4, 24) for _ in range(seqlen)] + [2]
 
     output_dir = Path("./data/c_test/esm_small")
-    module = ESM2(num_layers=4, embed_dim=128, attention_heads=4)
+    module = ESM2(num_layers=4, embed_dim=128, attention_heads=8, token_dropout=False)
+    module.eval()
     x = torch.tensor(seq).unsqueeze(0)
     result = module(x, repr_layers=[0, 1, 2, 3, 4], need_head_weights=True)
-    print(result)
     module.export(output_dir)
-    export_tensor_dict({"tokens": x}, output_dir / "input")
-    export_tensor_dict(result["representations"], output_dir / "output")
+    export_tensor_dict({"tokens": x[:, 1:-1]}, output_dir / "input")
+
+    out_dict: dict[str, torch.Tensor] = {}
+    out_dict["attentions"] = result["attentions"][0].permute(2, 3, 0, 1)
+    out_dict["attentions_seq"] = result["attentions"][0, :, :, 1:-1, 1:-1].permute(2, 3, 0, 1)
+    for k, v in result["representations"].items():
+        out_dict[f"representations_{k}"] = v[0]
+    export_tensor_dict(out_dict, output_dir / "output")
+
+    for k, v in out_dict.items():
+        print(f"{k}: {v.shape}")
 
 
 if __name__ == "__main__":
