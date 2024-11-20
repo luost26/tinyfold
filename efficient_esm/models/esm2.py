@@ -1,9 +1,11 @@
 import re
+from pathlib import Path
 
 import torch
 import torch.nn as nn
 
 from efficient_esm.data.alphabet import Alphabet
+from efficient_esm.utils.export import export_tensor_dict, export_value_list
 
 from .heads import ContactPredictionHead, RobertaLMHead
 from .transformer import TransformerLayer
@@ -169,3 +171,20 @@ class ESM2(nn.Module):
 
     def predict_contacts(self, tokens):
         return self(tokens, return_contacts=True)["contacts"]
+
+    def export(self, dirpath: str | Path) -> None:
+        dirpath = Path(dirpath)
+
+        for i, layer in enumerate(self.layers):
+            layer.export(dirpath / f"transformer_{i}")
+
+        sd = {k: v for k, v in self.state_dict().items() if not k.startswith("layers.")}
+        export_tensor_dict(sd, dirpath)
+        export_value_list(
+            [
+                self.num_layers,
+                self.embed_dim,
+                self.attention_heads,
+            ],
+            dirpath / "config.txt",
+        )

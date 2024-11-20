@@ -6,6 +6,7 @@ from efficient_esm.models.structure_module import InvariantPointAttention, Rigid
 from efficient_esm.models.esmfold import ESMFold
 from efficient_esm.models.transformer import TransformerLayer
 from efficient_esm.utils.export import export_tensor_dict
+from efficient_esm.models.esm2 import ESM2
 
 torch.set_grad_enabled(False)
 
@@ -113,6 +114,22 @@ def transformer():
     export_tensor_dict(outs, output_dir / "output")
     for k, v in outs.items():
         print(f"{k}: {v.shape}")
+
+
+def esm_small():
+    torch.manual_seed(0)
+    random.seed(0)
+    seqlen = 17
+    seq = [1] + [random.randint(4, 24) for _ in range(seqlen - 2)] + [2]
+
+    output_dir = Path("./data/c_test/esm_small")
+    module = ESM2(num_layers=4, embed_dim=128, attention_heads=4)
+    x = torch.tensor(seq).unsqueeze(0)
+    result = module(x, repr_layers=[0, 1, 2, 3, 4], need_head_weights=True)
+    print(result)
+    module.export(output_dir)
+    export_tensor_dict({"tokens": x}, output_dir / "input")
+    export_tensor_dict(result["representations"], output_dir / "output")
 
 
 if __name__ == "__main__":
