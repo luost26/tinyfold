@@ -792,7 +792,7 @@ class StructureModule(nn.Module):
         dirpath = Path(dirpath)
         self.ipa.export(dirpath / "ipa")
         sd = {k: v for k, v in self.state_dict().items() if not k.startswith("ipa.")}
-        export_tensor_dict(self.state_dict(), dirpath)
+        export_tensor_dict(sd, dirpath)
         torch.save(sd, dirpath / "state_dict.pt")
         export_value_list(
             [
