@@ -153,7 +153,6 @@ struct Adaptor {
 
     void operator()(const matrix<float> &esm_s, const matrix<float> &esm_z, const matrix<int> &aatype, const matrix<int> &residx, AdaptorBuffer &buffer) {
         // esm_s_mlp
-        std::cerr << "Running esm_s_mlp" << std::endl;
         fused_layer_norm_linear<ReLU>(esm_s, esm_s_mlp_0_layernorm_weight, esm_s_mlp_0_layernorm_bias, esm_s_mlp_1_linear_weight, esm_s_mlp_1_linear_bias, buffer.s);
         linear_(buffer.s, esm_s_mlp_3_linear_weight, esm_s_mlp_3_linear_bias, &buffer.s_inplace_buffer);
         #pragma omp parallel for
@@ -164,7 +163,6 @@ struct Adaptor {
         }
 
         // esm_z_mlp
-        std::cerr << "Running esm_z_mlp" << std::endl;
         fused_layer_norm_linear<ReLU>(esm_z, esm_z_mlp_0_layernorm_weight, esm_z_mlp_0_layernorm_bias, esm_z_mlp_1_linear_weight, esm_z_mlp_1_linear_bias, buffer.z);
         linear_(buffer.z, esm_z_mlp_3_linear_weight, esm_z_mlp_3_linear_bias, &buffer.z_inplace_buffer);
 
