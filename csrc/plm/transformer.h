@@ -73,8 +73,6 @@ struct TransformerBuffer {
     int seqlen;
     TransformerConfig cfg;
 
-    matrix<float> x;
-
     matrix<float> q;
     matrix<float> k;
     matrix<float> attn_weights;
@@ -83,7 +81,6 @@ struct TransformerBuffer {
     TransformerBuffer(int seqlen, const TransformerConfig &cfg):
         seqlen(seqlen),
         cfg(cfg),
-        x(seqlen, cfg.embed_dim),
         q(cfg.num_heads * seqlen, cfg.head_dim()),
         k(cfg.num_heads * seqlen, cfg.head_dim()),
         attn_weights(cfg.num_heads * seqlen, seqlen),
@@ -162,22 +159,22 @@ struct TransformerLayer {
 
     }
 
-    void operator() (const matrix<float> &x, TransformerBuffer &buffer) {
-        layer_norm(x, self_attn_layer_norm_weight, self_attn_layer_norm_bias, buffer.x);
-        attn_proj_linear(buffer.x, q_proj_weight, q_proj_bias, buffer.q);
-        attn_proj_linear(buffer.x, k_proj_weight, k_proj_bias, buffer.k);
+    void operator() (const matrix<float> &x, matrix<float> &y, TransformerBuffer &buffer) {
+        layer_norm(x, self_attn_layer_norm_weight, self_attn_layer_norm_bias, y);
+        attn_proj_linear(y, q_proj_weight, q_proj_bias, buffer.q);
+        attn_proj_linear(y, k_proj_weight, k_proj_bias, buffer.k);
         apply_rotary_embedding_(buffer.q, cfg.num_heads);
         apply_rotary_embedding_(buffer.k, cfg.num_heads);
         bmm<true>(buffer.q, buffer.k, buffer.attn_weights);
         softmax_(buffer.attn_weights);
 
-        attn_proj_linear(buffer.x, v_proj_weight, v_proj_bias, buffer.k);  // Use k buffer to save memory
+        attn_proj_linear(y, v_proj_weight, v_proj_bias, buffer.k);  // Use k buffer to save memory
         bmm(buffer.attn_weights, buffer.k, buffer.q);  // Use q buffer to save memory
-        attn_out_linear(buffer.q, out_proj_weight, out_proj_bias, buffer.x);
-        add_(buffer.x, x);
+        attn_out_linear(buffer.q, out_proj_weight, out_proj_bias, y);
+        add_(y, x);
 
-        fused_layer_norm_linear<GELU>(buffer.x, final_layer_norm_weight, final_layer_norm_bias, fc1_weight, fc1_bias, buffer.x1);
-        linear_residual(buffer.x1, fc2_weight, fc2_bias, buffer.x);
+        fused_layer_norm_linear<GELU>(y, final_layer_norm_weight, final_layer_norm_bias, fc1_weight, fc1_bias, buffer.x1);
+        linear_residual(buffer.x1, fc2_weight, fc2_bias, y);
     }
 };
 
