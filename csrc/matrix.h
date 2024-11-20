@@ -89,13 +89,13 @@ void matmul(const matrix<T> &A, const matrix<T> &B, matrix<T> &C)
             T sum = 0;
             for (int k = 0; k < A.n_cols; k++)
             {
-                if (transposed_B) {
+                if constexpr (transposed_B) {
                     sum += *A(i, k) * *B(j, k);
                 } else {
                     sum += *A(i, k) * *B(k, j);
                 }
             }
-            if (residual) {
+            if constexpr (residual) {
                 *C(i, j) += sum;
             } else {
                 *C(i, j) = sum;
@@ -156,8 +156,8 @@ void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, m
         for (int j = 0; j < C.n_cols; j++)
         {
             T sum = 0;
-            if (is_bias_vector) {
-                if (transposed_B) {
+            if constexpr (is_bias_vector) {
+                if constexpr (transposed_B) {
                     sum = *bias(j, 0);
                 } else {
                     sum = *bias(i, 0);
@@ -167,19 +167,19 @@ void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, m
             }
             for (int k = 0; k < A.n_cols; k++)
             {
-                if (transposed_B) {
+                if constexpr (transposed_B) {
                     sum += *A(i, k) * *B(j, k);
                 } else {
                     sum += *A(i, k) * *B(k, j);
                 }
             }
-            if (act_type == ReLU) {
+            if constexpr (act_type == ReLU) {
                 sum = std::max((T)0, sum);
-            } else if (act_type == GELU) {
+            } else if constexpr (act_type == GELU) {
                 sum = sum * 0.5 * (1.0 + erf(sum / SQRT2));
             }
 
-            if (residual) {
+            if constexpr (residual) {
                 *C(i, j) += sum;
             } else {
                 *C(i, j) = sum;
@@ -220,7 +220,7 @@ void bmm(const matrix<T> &A, const matrix<T> &B, matrix<T> &C) {
         for (int j = 0; j < M; j ++) {
             T sum = 0;
             for (int k = 0; k < K; k ++) {
-                if (transposed_B) {
+                if constexpr (transposed_B) {
                     sum += *A(i, k) * *B(batch_idx * M + j, k);
                 } else {
                     sum += *A(i, k) * *B(batch_idx * K + k, j);
@@ -237,9 +237,7 @@ void softmax_(matrix<T> &A) {
     for (int i = 0; i < A.n_rows; i++) {
         T max_val = *A(i, 0);
         for (int j = 0; j < A.n_cols; j++) {
-            if (*A(i, j) > max_val) {
-                max_val = *A(i, j);
-            }
+            max_val = std::max(max_val, *A(i, j));
         }
         T sum = 0;
         for (int j = 0; j < A.n_cols; j++) {

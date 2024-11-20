@@ -136,7 +136,7 @@ class ESM2(nn.Module):
         if not padding_mask.any():
             padding_mask = None
 
-        for layer_idx, layer in enumerate(self.layers):
+        for layer_idx, layer in enumerate(tqdm(self.layers, desc="Transformer layer forward")):
             x, attn = layer(
                 x,
                 self_attn_padding_mask=padding_mask,

@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <chrono>
 #include "../matrix.h"
 #include "transformer.h"
 #include "alphabet.h"
@@ -155,7 +156,7 @@ struct ESM {
 
         matrix<float> *in_ptr, *out_ptr;
         for (int i = 0; i < std::min(cfg.num_layers, stop_at); i ++) {
-            std::cerr << "Running transformer layer #" << i + 1 << std::endl;
+            std::cerr << "Running transformer layer #" << i + 1;
             if (i % 2 == 0) {
                 in_ptr = &buffer.x;
                 out_ptr = &buffer.y;
@@ -163,10 +164,14 @@ struct ESM {
                 in_ptr = &buffer.y;
                 out_ptr = &buffer.x;
             }
+            auto start = std::chrono::steady_clock::now();
             (*transformer_layers[i])(*in_ptr, *out_ptr, *buffer.transformer_buffer);
             if (i == cfg.num_layers - 1) {
                 layer_norm(*out_ptr, emb_layer_norm_after_weight, emb_layer_norm_after_bias, *out_ptr);
             }
+            auto end = std::chrono::steady_clock::now();
+            // Report in seconds
+            std::cerr << "... (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0 << "s)" << std::endl;
             if (repr_out != nullptr) {
                 repr_out->accumulate_s(*out_ptr, i + 1);
                 repr_out->save_z(buffer.transformer_buffer->attn_weights, i);
