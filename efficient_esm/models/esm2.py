@@ -3,6 +3,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
+from tqdm.auto import tqdm
 
 from efficient_esm.data.alphabet import Alphabet
 from efficient_esm.utils.export import export_tensor_dict, export_value_list
@@ -18,7 +19,7 @@ class ESM2(nn.Module):
         embed_dim: int = 1280,
         attention_heads: int = 20,
         alphabet: Alphabet | str = "ESM-1b",
-        token_dropout: bool = True,
+        token_dropout: bool = False,
     ):
         super().__init__()
         self.num_layers = num_layers
@@ -34,7 +35,8 @@ class ESM2(nn.Module):
         self.eos_idx = alphabet.eos_idx
         self.prepend_bos = alphabet.prepend_bos
         self.append_eos = alphabet.append_eos
-        self.token_dropout = token_dropout
+        # self.token_dropout = token_dropout
+        self.token_dropout = False
 
         self._init_submodules()
 
@@ -175,7 +177,7 @@ class ESM2(nn.Module):
     def export(self, dirpath: str | Path) -> None:
         dirpath = Path(dirpath)
 
-        for i, layer in enumerate(self.layers):
+        for i, layer in enumerate(tqdm(self.layers, desc="Exporting transformer layers")):
             layer.export(dirpath / f"transformer_{i}")
 
         sd = {k: v for k, v in self.state_dict().items() if not k.startswith("layers.")}

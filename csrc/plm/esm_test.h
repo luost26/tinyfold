@@ -1,6 +1,7 @@
 #ifndef PLM_ESM_TEST_H
 #define PLM_ESM_TEST_H
 
+#include "alphabet.h"
 #include "esm.h"
 
 void test_esm_small() {
@@ -44,6 +45,33 @@ void test_esm_small() {
     TEST_INTERMEDIATE_ALLCLOSE(repr_out.z, attentions_seq, 1e-4f);
     #undef TEST_INTERMEDIATE_ALLCLOSE
 
+}
+
+void test_esm_full_3B() {
+    std::cout << "====== Test ESM (Full-3B) ======" << std::endl;
+    const std::string dirpath = "../data/c_test/esm_full_3B";
+    std::cout << "dirpath = " << dirpath << std::endl;
+    const std::string seq("ASAWPEEKNYHQPAILNSSALRQIAEGTSISEMWQNDLQPLLIERYPGSPGSYAARQHIMQRIQRLQADWVLEIDTFLSQTPYGYRSFSNIISTLNPTAKRHLVLACHYDSKYFSHWNNRVFVGATDS");
+    matrix<int> esm_aatype = tokenize_esm_aatype(seq);
+    int seqlen = esm_aatype.n_rows;
+
+    std::unique_ptr<ESM> esm(load_esm(dirpath));
+    std::unique_ptr<ESMBuffer> buffer(esm->create_buffer(esm_aatype));
+
+    matrix<float> repr_wgt(esm->cfg.num_layers + 1, 1);
+    load_(repr_wgt, dirpath + "/input/esm_s_combine_normalized.bin");
+    ESMRepresentation repr_out(seqlen, esm->cfg, repr_wgt);
+
+    #define TEST_INTERMEDIATE_ALLCLOSE(NAME,OUTNAME,ATOL) { \
+        auto OUTNAME##_ref = matrix<float>(dirpath + "/output/" #OUTNAME ".bin", NAME.n_rows, NAME.n_cols); \
+        TEST_ALLCLOSE(#OUTNAME, NAME, OUTNAME##_ref, ATOL); \
+    }
+    (*esm)(esm_aatype, *buffer, &repr_out, 36);
+    // TEST_INTERMEDIATE_ALLCLOSE(repr_out.s, representations_seq_36, 2e-3f);
+    TEST_INTERMEDIATE_ALLCLOSE(repr_out.s, esm_s, 1e-2f);
+
+    TEST_INTERMEDIATE_ALLCLOSE(repr_out.z, attentions_seq, 5e-3f);
+    #undef TEST_INTERMEDIATE_ALLCLOSE
 }
 
 #endif // PLM_ESM_TEST_H

@@ -129,7 +129,6 @@ struct TransformerLayer {
         fc2_weight(cfg.embed_dim, cfg.ffn_embed_dim),
         fc2_bias(cfg.embed_dim, 1)
     {
-        std::cerr << "Loading weights for TransformerLayer from " << dirpath << std::endl;
         load_(self_attn_layer_norm_weight, dirpath + "/self_attn_layer_norm.weight.bin");
         load_(self_attn_layer_norm_bias, dirpath + "/self_attn_layer_norm.bias.bin");
         load_(k_proj_weight, dirpath + "/self_attn.k_proj.weight.bin");
@@ -149,6 +148,7 @@ struct TransformerLayer {
         load_(fc2_bias, dirpath + "/fc2.bias.bin");
         load_(final_layer_norm_weight, dirpath + "/final_layer_norm.weight.bin");
         load_(final_layer_norm_bias, dirpath + "/final_layer_norm.bias.bin");
+        std::cerr << "Loaded weights for TransformerLayer from " << dirpath << std::endl;
     }
 
     TransformerBuffer * create_buffer(int seqlen) const {

@@ -155,6 +155,7 @@ struct ESM {
 
         matrix<float> *in_ptr, *out_ptr;
         for (int i = 0; i < std::min(cfg.num_layers, stop_at); i ++) {
+            std::cerr << "Running transformer layer #" << i + 1 << std::endl;
             if (i % 2 == 0) {
                 in_ptr = &buffer.x;
                 out_ptr = &buffer.y;
@@ -190,7 +191,16 @@ ESM * load_esm(const std::string &dirpath) {
 
     std::vector<TransformerLayer *> transformer_layers;
     for (int i = 0; i < num_layers; i ++) {
-        transformer_layers.push_back(load_transformer_layer(get_transformer_layer_path(dirpath, i)));
+        transformer_layers.push_back(nullptr);
+    }
+
+    #pragma omp parallel for
+    for (int i = 0; i < num_layers; i ++) {
+        auto *ptr = load_transformer_layer(get_transformer_layer_path(dirpath, i));
+        #pragma omp critical
+        {
+            transformer_layers[i] = ptr;
+        }
     }
     ESMConfig esm_cfg(num_layers, embed_dim, attention_heads, transformer_layers[0]->cfg);
     return new ESM(esm_cfg, dirpath, transformer_layers);

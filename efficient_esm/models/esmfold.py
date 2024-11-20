@@ -136,6 +136,7 @@ class ESMFold(nn.Module):
         esm_s = torch.stack([v for _, v in sorted(res["representations"].items())], dim=2)
         esm_s = esm_s[:, 1:-1]  # B, L, nLayers, C
         esm_z = (
+            # NOTE: Here the dim order is 4-3 not 3-4!!!
             res["attentions"].permute(0, 4, 3, 1, 2).flatten(3, 4)[:, 1:-1, 1:-1, :]
             if self.cfg.use_esm_attn_map
             else None
@@ -359,7 +360,7 @@ class ESMFold(nn.Module):
     def device(self):
         return self.esm_s_combine.device
 
-    def export(self, dirpath: str | Path) -> None:
+    def export_folding(self, dirpath: str | Path) -> None:
         dirpath = Path(dirpath)
         os.makedirs(dirpath, exist_ok=True)
         adaptor_state_dict: dict[str, torch.Tensor] = {
@@ -379,3 +380,9 @@ class ESMFold(nn.Module):
             self.trunk.cfg.position_bins,
             self.trunk.recycle_bins,
         ], dirpath / "adaptor" / "config.txt")
+
+    def export(self, dirpath: str | Path) -> None:
+        dirpath = Path(dirpath)
+        self.esm.export(dirpath / "esm")
+        self.export_folding(dirpath / "folding")
+        export_tensor_dict({"esm_s_combine_normalized": self.esm_s_combine.softmax(0)}, dirpath)
