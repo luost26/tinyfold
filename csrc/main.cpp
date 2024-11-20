@@ -5,6 +5,7 @@
 #include "folding/test.h"
 #include "plm/transformer_test.h"
 #include "plm/esm_test.h"
+#include "tinyfold.h"
 
 int main() {
     // test_ipa();
@@ -13,7 +14,10 @@ int main() {
     // test_adaptor();
     // test_folding();
     // test_transformer();
-    test_esm_small();
-
+    // test_esm_small();
+    // test_esm_full_3B();
+    std::unique_ptr<TinyFold> tinyfold(load_tinyfold("../data/c_test/esmfold"));
+    std::string seq("ASAWPEEKNYHQPAILNSSALRQIAEGTSISEMWQNDLQPLLIERYPGSPGSYAARQHIMQRIQRLQADWVLEIDTFLSQTPYGYRSFSNIISTLNPTAKRHLVLACHYDSKYFSHWNNRVFVGATDS");
+    tinyfold->operator()(seq);
     return 0;
 }
