@@ -3,8 +3,20 @@
 
 #include <iostream>
 #include <fstream>
+#include <chrono>
 #include "../matrix.h"
 #include "../linear.h"
+
+
+template <
+    class result_t   = std::chrono::milliseconds,
+    class clock_t    = std::chrono::steady_clock,
+    class duration_t = std::chrono::milliseconds
+>
+result_t since(std::chrono::time_point<clock_t, duration_t> const& start)
+{
+    return std::chrono::duration_cast<result_t>(clock_t::now() - start);
+}
 
 
 inline float rotary_angle(int s, int d, int dim) {
@@ -39,11 +51,11 @@ inline void apply_rotary_embedding_(matrix<float> &x, int num_heads) {
 }
 
 struct TransformerConfig {
-    int embed_dim;
-    int num_heads;
-    int kdim;
-    int vdim;
-    int ffn_embed_dim;
+    int embed_dim;  // 2560
+    int num_heads;  // 40
+    int kdim;  // 2560
+    int vdim;  // 2560
+    int ffn_embed_dim;  // 10240
 
     int head_dim() const {
         return embed_dim / num_heads;
@@ -160,21 +172,27 @@ struct TransformerLayer {
     }
 
     void operator() (const matrix<float> &x, matrix<float> &y, TransformerBuffer &buffer) {
-        layer_norm(x, self_attn_layer_norm_weight, self_attn_layer_norm_bias, y);
-        attn_proj_linear(y, q_proj_weight, q_proj_bias, buffer.q);
-        attn_proj_linear(y, k_proj_weight, k_proj_bias, buffer.k);
-        apply_rotary_embedding_(buffer.q, cfg.num_heads);
-        apply_rotary_embedding_(buffer.k, cfg.num_heads);
-        bmm<true>(buffer.q, buffer.k, buffer.attn_weights);
-        softmax_(buffer.attn_weights);
+        std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        #define RECORD_TIME(msg) { std::cerr << msg << ": " << since(start).count() << "ms" << std::endl; start = std::chrono::steady_clock::now(); }
+
+        layer_norm(x, self_attn_layer_norm_weight, self_attn_layer_norm_bias, y); RECORD_TIME("layer_norm");
+        attn_proj_linear(y, q_proj_weight, q_proj_bias, buffer.q); RECORD_TIME("q_proj_linear");
+        attn_proj_linear(y, k_proj_weight, k_proj_bias, buffer.k); RECORD_TIME("k_proj_linear");
+        apply_rotary_embedding_(buffer.q, cfg.num_heads); RECORD_TIME("apply_rotary_embedding");
+        apply_rotary_embedding_(buffer.k, cfg.num_heads); RECORD_TIME("apply_rotary_embedding");
+        bmm<true>(buffer.q, buffer.k, buffer.attn_weights); RECORD_TIME("bmm");
+        softmax_(buffer.attn_weights); RECORD_TIME("softmax");
 
         attn_proj_linear(y, v_proj_weight, v_proj_bias, buffer.k);  // Use k buffer to save memory
+        RECORD_TIME("v_proj_linear");
         bmm(buffer.attn_weights, buffer.k, buffer.q);  // Use q buffer to save memory
-        attn_out_linear(buffer.q, out_proj_weight, out_proj_bias, y);
-        add_(y, x);
+        RECORD_TIME("bmm");
+        
+        attn_out_linear(buffer.q, out_proj_weight, out_proj_bias, y); RECORD_TIME("attn_out_linear");
+        add_(y, x); RECORD_TIME("add");
 
-        fused_layer_norm_linear<GELU>(y, final_layer_norm_weight, final_layer_norm_bias, fc1_weight, fc1_bias, buffer.x1);
-        linear_residual(buffer.x1, fc2_weight, fc2_bias, y);
+        fused_layer_norm_linear<GELU>(y, final_layer_norm_weight, final_layer_norm_bias, fc1_weight, fc1_bias, buffer.x1); RECORD_TIME("fused_layer_norm_linear");
+        linear_residual(buffer.x1, fc2_weight, fc2_bias, y); RECORD_TIME("linear_residual");
     }
 };
 
