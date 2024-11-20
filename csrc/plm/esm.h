@@ -82,7 +82,8 @@ struct ESMRepresentation {
         for (int i = 0; i < seqlen; i ++) {
             for (int j = 0; j < seqlen; j ++) {
                 for (int k = 0; k < cfg.attention_heads; k ++) {
-                    *z(i * seqlen + j, layer * cfg.attention_heads + k) = *attn_weights(k * (seqlen + 2) + i + 1, j + 1);
+                    // NOTE: The order here is (j, i) according to esmfold.py L140
+                    *z(j * seqlen + i, layer * cfg.attention_heads + k) = *attn_weights(k * (seqlen + 2) + i + 1, j + 1);
                 }
             }
         }
