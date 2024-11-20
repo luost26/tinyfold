@@ -304,18 +304,19 @@ inline bool allclose(const matrix<T> &A, const matrix<T> &B, T atol = 1e-6, T * 
     if (A.n_rows != B.n_rows || A.n_cols != B.n_cols) {
         return false;
     }
+    T largest_error = 0;
     for (int i = 0; i < A.n_rows; i++) {
         for (int j = 0; j < A.n_cols; j++) {
             T error = std::abs(*A(i, j) - *B(i, j));
-            if (error > atol) {
-                if (error_output) {
-                    *error_output = error;
-                }
-                return false;
+            if (error > largest_error || error != error) {
+                largest_error = error;
             }
         }
     }
-    return true;
+    if (error_output != nullptr) {
+        *error_output = largest_error;
+    }
+    return largest_error <= atol;
 }
 
 
