@@ -3,7 +3,7 @@ project(folddotc)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_FLAGS "-O3 -funroll-loops")
+set(CMAKE_CXX_FLAGS "-O3 -funroll-loops -mavx2 -mfma -ffast-math -fpermissive")
 
 set(PROJECT_SOURCE_DIR ${CMAKE_SOURCE_DIR}/csrc)
 

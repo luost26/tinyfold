@@ -3,7 +3,7 @@
 
 #include "../matrix.h"
 
-void pseudo_quantize_(matrix<float> &A, int block_size, int num_bits) {
+void pseudo_quantize(const matrix<float> &A, int block_size, int num_bits, matrix<float> &out) {
     int numel = A.numel();
     if (numel % block_size != 0) {
         std::cerr << "pseudo_quantize_: number of elements must be divisible by block_size" << std::endl;
@@ -27,10 +27,13 @@ void pseudo_quantize_(matrix<float> &A, int block_size, int num_bits) {
             int w_q = (int)std::round(w / scale) + zero_point;
             w_q = std::min(std::max(w_q, 0), max_int);
             float w_dq = scale * (w_q - zero_point);
-            A.data[block_idx * block_size + i] = w_dq;
+            out.data[block_idx * block_size + i] = w_dq;
         }
     }
 }
 
+void pseudo_quantize_(matrix<float> &A, int block_size, int num_bits) {
+    pseudo_quantize(A, block_size, num_bits, A);
+}
 
 #endif  // UTILS_PSEUDO_QUANT_H

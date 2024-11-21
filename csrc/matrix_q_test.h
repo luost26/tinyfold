@@ -12,7 +12,7 @@ void test_quantize_8bit() {
     }
     // std::cerr << "Original: " << A << std::endl;
 
-    auto *Q = quantize<Q8>(A, 128);
+    auto *Q = quantize<Q8, 128>(A);
     pseudo_quantize_(A, 128, 8);
 
     // std::cerr << "A: " << A << std::endl;
@@ -42,7 +42,7 @@ void test_quantize_4bit() {
     }
     // std::cerr << "Original: " << A << std::endl;
 
-    auto *Q = quantize<Q4>(A, 128);
+    auto *Q = quantize<Q4, 128>(A);
     pseudo_quantize_(A, 128, 4);
 
     // std::cerr << "A: " << A << std::endl;

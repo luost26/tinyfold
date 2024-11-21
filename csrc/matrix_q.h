@@ -9,19 +9,22 @@ enum NumBits {
     Q8 = 8,
 };
 
-template <NumBits num_bits>
+template <NumBits num_bits, int block_size>
 struct quantized_matrix {
     unsigned char *data;
-    int block_size;
     float *scales;
     int *zero_points;
     int n_rows;
     int n_cols;
 
-    quantized_matrix(int n_rows, int n_cols, int block_size):
-        n_rows(n_rows), n_cols(n_cols), block_size(block_size)
+    quantized_matrix(int n_rows, int n_cols):
+        n_rows(n_rows), n_cols(n_cols)
     {
         int numel = n_rows * n_cols;
+        if (n_cols % 2 != 0) {
+            std::cerr << "Number of columns is not a multiple of 2" << std::endl;
+            return;
+        }
         if (numel % block_size != 0) {
             std::cerr << "Matrix size is not a multiple of block size" << std::endl;
             return;
@@ -58,6 +61,14 @@ struct quantized_matrix {
         return (row * n_cols + col) / block_size;
     }
 
+    inline int elem_index(int row, int col) const {
+        if constexpr (num_bits == Q8) {
+            return (row * n_cols + col);
+        } else if constexpr (num_bits == Q4) {
+            return (row * n_cols + col) / 2;
+        }
+    }
+
     inline int quantized_value_at(int row, int col) const {
         if constexpr (num_bits == Q8) {
             return data[row * n_cols + col];
@@ -79,10 +90,36 @@ struct quantized_matrix {
             return scales[grp_idx] * (w_q - zero_points[grp_idx]);
         }
     }
+
+    inline void dequantize(matrix<float> &out) const {
+        if (out.n_rows != n_rows || out.n_cols != n_cols) {
+            std::cerr << "Output matrix size mismatch" << std::endl;
+            return;
+        }
+        for (int i = 0; i < n_rows; i ++) {
+            for (int j = 0; j < n_cols; j ++) {
+                *out(i, j) = dequantize(i, j);
+            }
+        }
+    }
+
+    inline void dequantize_q4(int row, int col, float &v1, float &v2) const {
+        if constexpr (num_bits != Q4) {
+            std::cerr << "dequantize_q4 is only available for Q4 quantized matrices" << std::endl;
+            return;
+        }
+        int elem_idx = row * n_cols + col;
+        int grp_idx = group_index(row, col);
+        int w_q = data[elem_idx / 2];
+        float scale = scales[grp_idx];
+        int zero_point = zero_points[grp_idx];
+        v1 = scale * ((w_q >> 4) - zero_point);
+        v2 = scale * ((w_q & 0x0F) - zero_point);
+    }
 };
 
-template <NumBits num_bits>
-quantized_matrix<num_bits>* quantize(const matrix<float> &A, int block_size, quantized_matrix<num_bits> *out = nullptr) {
+template <NumBits num_bits, int block_size>
+quantized_matrix<num_bits, block_size>* quantize(const matrix<float> &A, quantized_matrix<num_bits, block_size> *out = nullptr) {
     const int numel = A.numel();
     if (numel % block_size != 0) {
         std::cerr << "Matrix size is not a multiple of block size" << std::endl;
@@ -91,12 +128,12 @@ quantized_matrix<num_bits>* quantize(const matrix<float> &A, int block_size, qua
     const int num_blocks = A.numel() / block_size;
     
     constexpr int max_int = (1 << (int)num_bits) - 1;
-    quantized_matrix<num_bits> *q_matrix = out;
+    quantized_matrix<num_bits, block_size> *q_matrix = out;
 
     if (q_matrix == nullptr) {
-        q_matrix = new quantized_matrix<num_bits>(A.n_rows, A.n_cols, block_size);
+        q_matrix = new quantized_matrix<num_bits, block_size>(A.n_rows, A.n_cols);
     } else {
-        if (q_matrix->n_rows != A.n_rows || q_matrix->n_cols != A.n_cols || q_matrix->block_size != block_size) {
+        if (q_matrix->n_rows != A.n_rows || q_matrix->n_cols != A.n_cols) {
             std::cerr << "Output matrix size mismatch" << std::endl;
             exit(1);
         }
@@ -139,8 +176,8 @@ quantized_matrix<num_bits>* quantize(const matrix<float> &A, int block_size, qua
     return q_matrix;
 }
 
-template <NumBits num_bits>
-std::ostream& operator<<(std::ostream &os, const quantized_matrix<num_bits> &A)
+template <NumBits num_bits, int block_size>
+std::ostream& operator<<(std::ostream &os, const quantized_matrix<num_bits, block_size> &A)
 {
 
     #define PRINT_ROW_ELEMENTS(MAT,ROW,LOW,UP) { \

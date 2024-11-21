@@ -99,15 +99,8 @@ void bmm(const matrix<T> &A, const matrix<T> &B, matrix<T> &C) {
 
     const int M = C.n_cols;
     const int K = A.n_cols;
-
-    int bsz;
-    if (transposed_B) {
-        bsz = B.n_rows / M;
-    } else {
-        bsz = B.n_rows / K;
-    }
+    int bsz = transposed_B ? B.n_rows / M : B.n_rows / K;
     const int N = A.n_rows / bsz;
-
 
     #pragma omp parallel for
     for (int i = 0; i < bsz * N; i ++) { 
@@ -171,11 +164,9 @@ void fused_layer_norm_linear_gelu(const matrix<T> &in, const matrix<T> &norm_wei
     }
 }
 
-template <typename T>
-void output_linear_residual(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, matrix<T> &C)
-{
-    if (&A == &C || &B == &C)
-    {
+template <typename T1, typename T2, typename T3, typename T4>
+void _check_output_linear_residual_shape(const T1 &A, const T2 &B, const T3 &bias, const T4 &C) {
+    if ((void*)&A == (void*)&C || (void*)&B == (void*)&C) {
         std::cerr << "Matrix multiplication cannot be done inplace" << std::endl;
         exit(1);
     }
@@ -201,17 +192,68 @@ void output_linear_residual(const matrix<T> &A, const matrix<T> &B, const matrix
         std::cerr << "Bias vector must have the same number of rows as the output matrix's number of cols" << std::endl;
         exit(1);
     }
+}
 
+void output_linear_residual(const matrix<float> &A, const matrix<float> &B, const matrix<float> &bias, matrix<float> &C) {
+    // A: (bsz, in_channels)
+    // B: (out_channels, in_channels)
+    // bias: (out_channels, 1)
+    // C: (bsz, out_channels)
+    _check_output_linear_residual_shape(A, B, bias, C);
     #pragma omp parallel for
     for (int i = 0; i < C.n_rows; i++) {
         for (int j = 0; j < C.n_cols; j++) {
-            T sum = *bias(j, 0);
+            float sum = *bias(j, 0);
             for (int k = 0; k < A.n_cols; k++) {
                 sum += *A(i, k) * *B(j, k);
             }
             *C(i, j) += sum;
         }
     }
+}
+
+template <int block_size>
+void output_linear_residual(const matrix<float> &A, const quantized_matrix<Q4, block_size> &B, const matrix<float> &bias, matrix<float> &C) {
+    matrix<float> *B_fp32 = new matrix<float>(B.n_rows, B.n_cols);
+    B.dequantize(*B_fp32);
+    output_linear_residual(A, *B_fp32, bias, C);
+    delete B_fp32;
+}
+
+template <int block_size>
+void output_linear_residual_(const matrix<float> &A, const quantized_matrix<Q4, block_size> &B, const matrix<float> &bias, matrix<float> &C) {
+    _check_output_linear_residual_shape(A, B, bias, C);
+    #pragma omp parallel for
+    for (int i = 0; i < C.n_rows; i++) {
+        for (int j = 0; j < C.n_cols; j++) {
+            float sum = *bias(j, 0);
+            for (int k = 0; k < A.n_cols; k += block_size) {
+                int grp_idx = B.group_index(j, k);
+                float scale = B.scales[grp_idx];
+                int zero_point = B.zero_points[grp_idx];
+
+                float inner_sum = 0.0f;
+                for (int l = 0; l < block_size; l += 8) {
+                    int elem_idx = B.elem_index(j, k + l);
+                    unsigned int wq_packed8 = ((unsigned int*)B.data)[elem_idx / 4];
+                    for (int m = 0; m < 8; m++) {
+                        int wq = (wq_packed8 >> (m * 4)) & 0x0F;
+                        float a = *A(i, k + l + m);
+                        inner_sum += a * (wq - zero_point);
+                    }
+                }
+                sum += scale * inner_sum;
+            }
+            *C(i, j) += sum;
+        }
+    }
+}
+
+template <int block_size>
+void output_linear_residual(const quantized_matrix<Q8, block_size> &A, const quantized_matrix<Q4, block_size> &B, const matrix<float> &bias, matrix<float> &C) {
+    _check_output_linear_residual_shape(A, B, bias, C);
+    std::cerr << "Not implemented" << std::endl;
+    exit(1);
 }
 
 

@@ -6,17 +6,8 @@
 #include <chrono>
 #include "../matrix.h"
 #include "../kernels.h"
+#include "../utils/timer.h"
 #include "transformer_kernels.h"
-
-template <
-    class result_t   = std::chrono::milliseconds,
-    class clock_t    = std::chrono::steady_clock,
-    class duration_t = std::chrono::milliseconds
->
-result_t since(std::chrono::time_point<clock_t, duration_t> const& start)
-{
-    return std::chrono::duration_cast<result_t>(clock_t::now() - start);
-}
 
 struct TransformerConfig {
     int embed_dim;  // 2560
@@ -141,8 +132,7 @@ struct TransformerLayer {
     }
 
     void operator() (const matrix<float> &x, matrix<float> &y, TransformerBuffer &buffer) {
-        std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-        #define RECORD_TIME(msg) { std::cerr << msg << ": " << since(start).count() << "ms" << std::endl; start = std::chrono::steady_clock::now(); }
+        START_TIMER();
 
         layer_norm(x, self_attn_layer_norm_weight, self_attn_layer_norm_bias, y); RECORD_TIME("layer_norm");
         attn_proj_linear(y, q_proj_weight, q_proj_bias, buffer.q); RECORD_TIME("q_proj_linear");
