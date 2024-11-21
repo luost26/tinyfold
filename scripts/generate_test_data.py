@@ -8,6 +8,7 @@ from efficient_esm.models.esmfold import ESMFold
 from efficient_esm.models.openfold import residue_constants
 from efficient_esm.models.transformer import TransformerLayer
 from efficient_esm.utils.export import export_tensor_dict
+from efficient_esm.utils.quantize import pseudo_quantize_tensor
 from efficient_esm.models.esm2 import ESM2
 from efficient_esm.models.esm_misc import batch_encode_sequences
 from efficient_esm.data.alphabet import Alphabet
@@ -227,6 +228,16 @@ def esmfold():
         dirpath / "input",
     )
     export_tensor_dict(out, dirpath / "output")
+
+
+def pseudo_quantize():
+    torch.manual_seed(0)
+    random.seed(0)
+    mat = torch.randn([128, 256])
+
+    quantized = pseudo_quantize_tensor(mat, 4, [128])
+
+    export_tensor_dict({"input": mat, "quantized": quantized}, Path("./data/c_test/pseudo_quantize"))
 
 
 if __name__ == "__main__":

@@ -52,6 +52,10 @@ struct matrix
     {
         return &data[i * n_cols + j];
     }
+
+    inline int numel() const {
+        return n_rows * n_cols;
+    }
 };
 
 
