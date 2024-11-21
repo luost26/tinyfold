@@ -5,7 +5,7 @@
 #include <fstream>
 #include <cmath>
 #include "../matrix.h"
-#include "../linear.h"
+#include "../kernel.h"
 #include "geometric.h"
 
 const float INF = 1e5f;
