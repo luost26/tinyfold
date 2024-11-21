@@ -370,6 +370,8 @@ std::ostream& operator<<(std::ostream &os, const matrix<T> &A)
             PRINT_ROW(A,i,A.n_cols);
         }
     }
+    #undef PRINT_ROW_ELEMENTS
+    #undef PRINT_ROW
     os << ", size=(" << A.n_rows << ", " << A.n_cols << ")]\n";
     return os;
 }
