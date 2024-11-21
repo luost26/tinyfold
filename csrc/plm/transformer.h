@@ -5,7 +5,7 @@
 #include <fstream>
 #include <chrono>
 #include "../matrix.h"
-#include "../kernel.h"
+#include "../kernels.h"
 
 
 template <

@@ -5,7 +5,7 @@
 #include <fstream>
 #include <omp.h>
 #include "../matrix.h"
-#include "../kernel.h"
+#include "../kernels.h"
 
 struct AdaptorConfig {
     int c_s;

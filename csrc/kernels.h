@@ -1,5 +1,5 @@
-#ifndef FOLDING_LINEAR_H
-#define FOLDING_LINEAR_H
+#ifndef KERNELS_H
+#define KERNELS_H
 
 #include <omp.h>
 #include "matrix.h"
@@ -204,4 +204,4 @@ void attn_out_linear(const matrix<T> &in, const matrix<T> &weight, const matrix<
 
 }
 
-#endif // FOLDING_LINEAR_H
+#endif // KERNELS_H

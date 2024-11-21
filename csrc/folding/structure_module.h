@@ -5,7 +5,7 @@
 #include <fstream>
 #include <memory>
 #include "../matrix.h"
-#include "../kernel.h"
+#include "../kernels.h"
 #include "geometric.h"
 #include "ipa.h"
 
