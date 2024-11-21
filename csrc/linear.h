@@ -137,9 +137,11 @@ void fused_layer_norm_linear(const matrix<T> &in, const matrix<T> &norm_weight, 
         for (int j = 0; j < out_channels; j ++) {
             T sum = *linear_bias(j, 0);
             for (int k = 0; k < in_channels; k ++) {
-                sum += (
-                    (*in(i, k) - mean) * inv_std * *norm_weight(k, 0) + *norm_bias(k, 0)
-                ) * *linear_weight(j, k);
+                auto in_0 = *in(i, k);
+                auto nw_0 = *norm_weight(k, 0);
+                auto nb_0 = *norm_bias(k, 0);
+                auto lw_0 = *linear_weight(j, k);
+                sum += ((in_0 - mean) * inv_std * nw_0 + nb_0) * lw_0;
             }
             if constexpr (act_type == ReLU) {
                 sum = sum > 0 ? sum : 0;
