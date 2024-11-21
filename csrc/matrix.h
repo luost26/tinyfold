@@ -192,50 +192,6 @@ void matmul_add(const matrix<T> &A, const matrix<T> &B, const matrix<T> &bias, m
     }
 }
 
-
-template <bool transposed_B = false, typename T>
-void bmm(const matrix<T> &A, const matrix<T> &B, matrix<T> &C) {
-    // A:     (bsz * N, K)
-    // B(tr): (bsz * M, K)
-    // B:     (bsz * K, M)
-    // C:     (bsz * N, M)
-    if (&A == &C || &B == &C)
-    {
-        std::cerr << "Matrix multiplication cannot be done inplace" << std::endl;
-        exit(1);
-    }
-
-    const int M = C.n_cols;
-    const int K = A.n_cols;
-
-    int bsz;
-    if (transposed_B) {
-        bsz = B.n_rows / M;
-    } else {
-        bsz = B.n_rows / K;
-    }
-    const int N = A.n_rows / bsz;
-
-
-    #pragma omp parallel for
-    for (int i = 0; i < bsz * N; i ++) { 
-        const int batch_idx = i / N;
-        const int n_idx = i % N;
-        for (int j = 0; j < M; j ++) {
-            T sum = 0;
-            for (int k = 0; k < K; k ++) {
-                if constexpr (transposed_B) {
-                    sum += *A(i, k) * *B(batch_idx * M + j, k);
-                } else {
-                    sum += *A(i, k) * *B(batch_idx * K + k, j);
-                }
-            }
-            *C(i, j) = sum;
-        }
-    }
-}
-
-
 template <typename T>
 void softmax_(matrix<T> &A) {
     for (int i = 0; i < A.n_rows; i++) {

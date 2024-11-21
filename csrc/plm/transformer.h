@@ -6,7 +6,7 @@
 #include <chrono>
 #include "../matrix.h"
 #include "../kernels.h"
-
+#include "transformer_kernels.h"
 
 template <
     class result_t   = std::chrono::milliseconds,
@@ -16,38 +16,6 @@ template <
 result_t since(std::chrono::time_point<clock_t, duration_t> const& start)
 {
     return std::chrono::duration_cast<result_t>(clock_t::now() - start);
-}
-
-
-inline float rotary_angle(int s, int d, int dim) {
-    const float inv_freq = 1.0f / powf(10000.0f, (float)((d * 2) % dim) / (float)dim);
-    const float angle = (float)s * inv_freq;
-    return angle;
-}
-
-inline void apply_rotary_embedding_(matrix<float> &x, int num_heads) {
-    const int dim = x.n_cols;
-    const int seqlen = x.n_rows / num_heads;
-    const int half_dim = dim / 2;
-    #pragma omp parallel for
-    for (int i = 0; i < num_heads * seqlen; ++i) {
-        const int head_idx = i / seqlen;
-        const int seq_idx = i % seqlen;
-        for (int j = 0; j < half_dim; j ++) {
-            float angle_lo = rotary_angle(seq_idx, j, dim);
-            float c_lo = cosf(angle_lo);
-            float s_lo = sinf(angle_lo);
-            float x_lo = *x(i, j) * c_lo - *x(i, j + half_dim) * s_lo;
-
-            float angle_hi = rotary_angle(seq_idx, j + half_dim, dim);
-            float c_hi = cosf(angle_hi);
-            float s_hi = sinf(angle_hi);
-            float x_hi = *x(i, j + half_dim) * c_hi + *x(i, j) * s_hi;
-
-            *x(i, j) = x_lo;
-            *x(i, j + half_dim) = x_hi;
-        }
-    }
 }
 
 struct TransformerConfig {
@@ -186,14 +154,14 @@ struct TransformerLayer {
 
         attn_proj_linear(y, v_proj_weight, v_proj_bias, buffer.k);  // Use k buffer to save memory
         RECORD_TIME("v_proj_linear");
-        bmm(buffer.attn_weights, buffer.k, buffer.q);  // Use q buffer to save memory
+        bmm<false>(buffer.attn_weights, buffer.k, buffer.q);  // Use q buffer to save memory
         RECORD_TIME("bmm");
         
         attn_out_linear(buffer.q, out_proj_weight, out_proj_bias, y); RECORD_TIME("attn_out_linear");
         add_(y, x); RECORD_TIME("add");
 
-        fused_layer_norm_linear<GELU>(y, final_layer_norm_weight, final_layer_norm_bias, fc1_weight, fc1_bias, buffer.x1); RECORD_TIME("fused_layer_norm_linear");
-        linear_residual(buffer.x1, fc2_weight, fc2_bias, y); RECORD_TIME("linear_residual");
+        fused_layer_norm_linear_gelu(y, final_layer_norm_weight, final_layer_norm_bias, fc1_weight, fc1_bias, buffer.x1); RECORD_TIME("fused_layer_norm_linear");
+        output_linear_residual(buffer.x1, fc2_weight, fc2_bias, y); RECORD_TIME("linear_residual");
     }
 };
 
