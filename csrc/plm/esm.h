@@ -91,14 +91,15 @@ struct ESMRepresentation {
     }
 };
 
+template <typename TransformerWeightType>
 struct ESM {
     ESMConfig cfg;
     matrix<float> embed_tokens;
-    std::vector<std::unique_ptr<TransformerLayer>> transformer_layers;
+    std::vector<std::unique_ptr<TransformerLayer<TransformerWeightType>>> transformer_layers;
     matrix<float> emb_layer_norm_after_weight;
     matrix<float> emb_layer_norm_after_bias;
 
-    ESM(const ESMConfig &cfg, const std::string &dirpath, std::vector<TransformerLayer *> transformer_layer_ptrs):
+    ESM(const ESMConfig &cfg, const std::string &dirpath, std::vector<TransformerLayer<TransformerWeightType> *> transformer_layer_ptrs):
         cfg(cfg),
         embed_tokens(ALPHABET_SIZE, cfg.embed_dim),
         emb_layer_norm_after_weight(cfg.embed_dim, 1),
@@ -184,7 +185,11 @@ std::string get_transformer_layer_path(const std::string &dirpath, int layer) {
     return dirpath + "/transformer_" + std::to_string(layer);
 }
 
-ESM * load_esm(const std::string &dirpath) {
+
+typedef ESM<matrix<float>> ESM_fp32;
+
+
+ESM<matrix<float>> * load_esm(const std::string &dirpath) {
     int num_layers, embed_dim, attention_heads;
     std::ifstream cfg_file(dirpath + "/config.txt");
     if (!cfg_file.is_open())
@@ -194,7 +199,7 @@ ESM * load_esm(const std::string &dirpath) {
     }
     cfg_file >> num_layers >> embed_dim >> attention_heads;
 
-    std::vector<TransformerLayer *> transformer_layers;
+    std::vector<TransformerLayer<matrix<float>> *> transformer_layers;
     for (int i = 0; i < num_layers; i ++) {
         transformer_layers.push_back(nullptr);
     }

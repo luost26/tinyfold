@@ -9,12 +9,12 @@
 #include "matrix.h"
 
 struct TinyFold {
-    std::unique_ptr<ESM> esm;
-    std::unique_ptr<matrix<float> > esm_s_combine_normalized;
+    std::unique_ptr<ESM_fp32> esm;
+    std::unique_ptr<matrix<float>> esm_s_combine_normalized;
     std::unique_ptr<Adaptor> adaptor;
     std::unique_ptr<StructureModule> structure_module;
 
-    TinyFold(ESM *esm, matrix<float> *esm_s_combine_normalized, Adaptor *adaptor, StructureModule *structure_module):
+    TinyFold(ESM_fp32 *esm, matrix<float> *esm_s_combine_normalized, Adaptor *adaptor, StructureModule *structure_module):
         esm(esm),
         esm_s_combine_normalized(esm_s_combine_normalized),
         adaptor(adaptor),
@@ -43,7 +43,7 @@ struct TinyFold {
 };
 
 TinyFold * load_tinyfold(const std::string &dirpath) {
-    ESM *esm = load_esm(dirpath + "/esm");
+    ESM_fp32 *esm = load_esm(dirpath + "/esm");
     matrix<float> *esm_s_combine_normalized = new matrix<float>(dirpath + "/esm_s_combine_normalized.bin", esm->cfg.num_layers + 1, 1);
     Adaptor *adaptor = load_adaptor(dirpath + "/folding/adaptor");
     StructureModule *structure_module = load_structure_module(dirpath + "/folding/structure_module");

@@ -11,7 +11,7 @@ void test_esm_small() {
     std::cout << "seqlen = " << seqlen << std::endl;
     std::cout << "dirpath = " << dirpath << std::endl;
 
-    std::unique_ptr<ESM> esm(load_esm(dirpath));
+    std::unique_ptr<ESM_fp32> esm(load_esm(dirpath));
     matrix<float> esm_aatype_f32 = matrix<float>(dirpath + "/input/tokens.bin", seqlen, 1);
     matrix<int> esm_aatype = matrix<int>(seqlen, 1);
     for (int i = 0; i < seqlen; i ++) {
@@ -55,7 +55,7 @@ void test_esm_full_3B() {
     matrix<int> esm_aatype = tokenize_esm_aatype(seq);
     int seqlen = esm_aatype.n_rows;
 
-    std::unique_ptr<ESM> esm(load_esm(dirpath));
+    std::unique_ptr<ESM_fp32> esm(load_esm(dirpath));
     std::unique_ptr<ESMBuffer> buffer(esm->create_buffer(esm_aatype));
 
     matrix<float> repr_wgt(esm->cfg.num_layers + 1, 1);

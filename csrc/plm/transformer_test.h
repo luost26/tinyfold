@@ -13,7 +13,7 @@ void test_transformer() {
     std::cout << "seqlen = " << seqlen << std::endl;
     std::cout << "dirpath = " << dirpath << std::endl;
 
-    std::unique_ptr<TransformerLayer> transformer(load_transformer_layer(dirpath));
+    std::unique_ptr<TransformerLayer<matrix<float>>> transformer(load_transformer_layer(dirpath));
     matrix<float> x = matrix<float>(dirpath + "/input/x.bin", seqlen, transformer->cfg.embed_dim);
     std::unique_ptr<TransformerBuffer> buffer(transformer->create_buffer(seqlen));
     matrix<float> y(seqlen, transformer->cfg.embed_dim);
@@ -42,7 +42,7 @@ void benchmark_transformer() {
     std::cout << "seqlen = " << seqlen << std::endl;
     std::cout << "dirpath = " << dirpath << std::endl;
 
-    std::unique_ptr<TransformerLayer> transformer(load_transformer_layer(dirpath));
+    std::unique_ptr<TransformerLayer<matrix<float>>> transformer(load_transformer_layer(dirpath));
     std::cout << "embed_dim: " << transformer->cfg.embed_dim << std::endl;
     std::cout << "num_heads: " << transformer->cfg.num_heads << std::endl;
     std::cout << "ffn_dim: " << transformer->cfg.ffn_embed_dim << std::endl;

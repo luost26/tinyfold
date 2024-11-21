@@ -101,23 +101,24 @@ struct TransformerBuffer {
 };
 
 
+template <typename WeightType=matrix<float>>
 struct TransformerLayer {
     TransformerConfig cfg;
     matrix<float> self_attn_layer_norm_weight;
     matrix<float> self_attn_layer_norm_bias;
 
-    matrix<float> k_proj_weight;
+    WeightType k_proj_weight;
     matrix<float> k_proj_bias;
-    matrix<float> v_proj_weight;
+    WeightType v_proj_weight;
     matrix<float> v_proj_bias;
-    matrix<float> q_proj_weight;
+    WeightType q_proj_weight;
     matrix<float> q_proj_bias;
-    matrix<float> out_proj_weight;
+    WeightType out_proj_weight;
     matrix<float> out_proj_bias;
 
-    matrix<float> fc1_weight;
+    WeightType fc1_weight;
     matrix<float> fc1_bias;
-    matrix<float> fc2_weight;
+    WeightType fc2_weight;
     matrix<float> fc2_bias;
     matrix<float> final_layer_norm_weight;
     matrix<float> final_layer_norm_bias;
@@ -197,7 +198,7 @@ struct TransformerLayer {
 };
 
 
-TransformerLayer * load_transformer_layer(const std::string &dirpath) {
+TransformerLayer<matrix<float>> * load_transformer_layer(const std::string &dirpath) {
     TransformerConfig cfg(dirpath + "/config.txt");
     return new TransformerLayer(cfg, dirpath);
 }
