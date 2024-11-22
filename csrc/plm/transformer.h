@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
+#include <filesystem>
 #include "../matrix.h"
 #include "../kernels.h"
 #include "../utils/timer.h"
@@ -72,8 +73,7 @@ void smart_load_(quantized_matrix<Q4, block_size> & A, const std::string & path)
     std::string path_trunk = path.substr(0, path.size() - 4);
     std::string metadata_path = path_trunk + QMATRIX_META_SUFFIX;
 
-    std::ifstream qmeta_file(metadata_path);
-    if (qmeta_file.good()) {
+    if (std::filesystem::exists(metadata_path)) {
         // If quantization metadata file exists, directly load it
         load_(A, metadata_path);
     } else {

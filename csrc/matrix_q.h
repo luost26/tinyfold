@@ -192,6 +192,14 @@ quantized_matrix<num_bits, block_size>* quantize(const matrix<float> &A, quantiz
 
 const std::string QMATRIX_META_SUFFIX = ".qmeta";
 
+void print_state(const std::ios& stream) {
+  std::cout << " good()=" << stream.good();
+  std::cout << " eof()=" << stream.eof();
+  std::cout << " fail()=" << stream.fail();
+  std::cout << " bad()=" << stream.bad();
+  std::cout << "Error details: " << strerror(errno) << std::endl;
+}
+
 template <NumBits num_bits, int block_size>
 void load_(quantized_matrix<num_bits, block_size> & A, const std::string & metadata_path) {
     const std::string path_trunk = metadata_path.substr(0, metadata_path.size() - 6);  // Suffix: .qmeta
@@ -199,22 +207,36 @@ void load_(quantized_matrix<num_bits, block_size> & A, const std::string & metad
     const std::string scales_path = path_trunk + ".scales";
     const std::string zero_points_path = path_trunk + ".zero_points";
 
-    int m_num_bits, m_block_size, m_n_rows, m_n_cols;
+    int m_num_bits=0, m_block_size=0, m_n_rows=0, m_n_cols=0;
     std::ifstream meta_file(metadata_path);
+    // Report any read error.
+    if (!meta_file) {
+        std::cerr << "Error reading metadata file: " << metadata_path << std::endl;
+        print_state(meta_file);
+        exit(1);
+    }
+
     meta_file >> m_num_bits >> m_block_size >> m_n_rows >> m_n_cols;
     if (m_num_bits != num_bits || m_block_size != block_size || m_n_rows != A.n_rows || m_n_cols != A.n_cols) {
-        std::cerr << "Metadata mismatch" << std::endl;
+        std::cerr << "Metadata mismatch: " << metadata_path << std::endl;
+        std::cerr << "  num_bits: " << m_num_bits << " != " << num_bits << std::endl;
+        std::cerr << "  block_size: " << m_block_size << " != " << block_size << std::endl;
+        std::cerr << "  n_rows: " << m_n_rows << " != " << A.n_rows << std::endl;
+        std::cerr << "  n_cols: " << m_n_cols << " != " << A.n_cols << std::endl;
         exit(1);
     }
 
     std::ifstream data_file(data_path, std::ios::binary);
     data_file.read((char*)A.data, A.data_size());
+    data_file.close();
 
     std::ifstream scales_file(scales_path, std::ios::binary);
     scales_file.read((char*)A.scales, A.num_blocks() * sizeof(float));
+    scales_file.close();
 
     std::ifstream zero_points_file(zero_points_path, std::ios::binary);
     zero_points_file.read((char*)A.zero_points, A.num_blocks() * sizeof(int));
+    zero_points_file.close();
 
     track_load(metadata_path);
     track_load(data_path);
