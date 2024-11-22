@@ -19,6 +19,7 @@ add_executable(test ${PROJECT_SOURCE_DIR}/test.cpp)
 add_executable(export_weights ${PROJECT_SOURCE_DIR}/export_weights.cpp)
 
 if(APPLE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xclang -fopenmp")
     include_directories("/opt/homebrew/opt/libomp/include")
     target_link_libraries(main "/opt/homebrew/opt/libomp/lib/libomp.dylib")
     target_link_libraries(test "/opt/homebrew/opt/libomp/lib/libomp.dylib")
