@@ -1,1 +1,1 @@
-# efficient-esm
+# TinyFold
