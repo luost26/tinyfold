@@ -5,6 +5,7 @@
 #include <string>
 #include <cstring>
 #include <cmath>
+#include "utils/load_tracker.h"
 
 template <typename T>
 struct matrix
@@ -285,6 +286,7 @@ void load_(matrix<T> & A, const std::string & path) {
         std::cerr << "Cannot open file " << path << std::endl;
         exit(1);
     }
+    track_load(path);
     std::ignore = fread(A.data, sizeof(T), A.n_rows * A.n_cols, f);
 }
 

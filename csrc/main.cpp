@@ -1,6 +1,10 @@
 #include <filesystem>
 #include "tinyfold.h"
 
+/*
+    Demo sequence:
+        ASAWPEEKNYHQPAILNSSALRQIAEGTSISEMWQNDLQPLLIERYPGSPGSYAARQHIMQRIQRLQADWVLEIDTFLSQTPYGYRSFSNIISTLNPTAKRHLVLACHYDSKYFSHWNNRVFVGATDS
+  */
 int main(int argc, char **argv) {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <model_dir>" << std::endl;

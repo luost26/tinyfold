@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include "matrix.h"
+#include "utils/load_tracker.h"
 
 enum NumBits {
     Q4 = 4,
@@ -55,6 +56,14 @@ struct quantized_matrix {
 
     int numel() const {
         return n_rows * n_cols;
+    }
+
+    int data_size() const {
+        if constexpr (num_bits == Q8) {
+            return numel();
+        } else if constexpr (num_bits == Q4) {
+            return numel() / 2;
+        }
     }
 
     int num_blocks() const {
@@ -185,9 +194,52 @@ const std::string QMATRIX_META_SUFFIX = ".qmeta";
 
 template <NumBits num_bits, int block_size>
 void load_(quantized_matrix<num_bits, block_size> & A, const std::string & metadata_path) {
-    std::string path_trunk = metadata_path.substr(0, metadata_path.size() - 6);  // Suffix: .qmeta
-    // Not implemented
-    throw std::runtime_error("Not implemented");
+    const std::string path_trunk = metadata_path.substr(0, metadata_path.size() - 6);  // Suffix: .qmeta
+    const std::string data_path = path_trunk + ".data";
+    const std::string scales_path = path_trunk + ".scales";
+    const std::string zero_points_path = path_trunk + ".zero_points";
+
+    int m_num_bits, m_block_size, m_n_rows, m_n_cols;
+    std::ifstream meta_file(metadata_path);
+    meta_file >> m_num_bits >> m_block_size >> m_n_rows >> m_n_cols;
+    if (m_num_bits != num_bits || m_block_size != block_size || m_n_rows != A.n_rows || m_n_cols != A.n_cols) {
+        std::cerr << "Metadata mismatch" << std::endl;
+        exit(1);
+    }
+
+    std::ifstream data_file(data_path, std::ios::binary);
+    data_file.read((char*)A.data, A.data_size());
+
+    std::ifstream scales_file(scales_path, std::ios::binary);
+    scales_file.read((char*)A.scales, A.num_blocks() * sizeof(float));
+
+    std::ifstream zero_points_file(zero_points_path, std::ios::binary);
+    zero_points_file.read((char*)A.zero_points, A.num_blocks() * sizeof(int));
+
+    track_load(metadata_path);
+    track_load(data_path);
+    track_load(scales_path);
+    track_load(zero_points_path);
+}
+
+template <NumBits num_bits, int block_size>
+void save_(const quantized_matrix<num_bits, block_size> & A, const std::string & metadata_path) {
+    const std::string path_trunk = metadata_path.substr(0, metadata_path.size() - 6);  // Suffix: .qmeta
+    const std::string data_path = path_trunk + ".data";
+    const std::string scales_path = path_trunk + ".scales";
+    const std::string zero_points_path = path_trunk + ".zero_points";
+
+    std::ofstream meta_file(metadata_path);
+    meta_file << num_bits << " " << block_size << " " << A.n_rows << " " << A.n_cols << std::endl;
+
+    std::ofstream data_file(data_path, std::ios::binary);
+    data_file.write((char*)A.data, A.data_size());
+
+    std::ofstream scales_file(scales_path, std::ios::binary);
+    scales_file.write((char*)A.scales, A.num_blocks() * sizeof(float));
+
+    std::ofstream zero_points_file(zero_points_path, std::ios::binary);
+    zero_points_file.write((char*)A.zero_points, A.num_blocks() * sizeof(int));
 }
 
 template <NumBits num_bits, int block_size>

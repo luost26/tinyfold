@@ -82,6 +82,7 @@ void smart_load_(quantized_matrix<Q4, block_size> & A, const std::string & path)
         load_(*temp, path);
         quantize(*temp, &A);
         delete temp;
+        save_(A, metadata_path);
     }
 }
 
