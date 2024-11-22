@@ -15,7 +15,13 @@ result_t since(std::chrono::time_point<clock_t, duration_t> const& start)
     return std::chrono::duration_cast<result_t>(clock_t::now() - start);
 }
 
-#define START_TIMER() std::chrono::steady_clock::time_point _timer_start = std::chrono::steady_clock::now(); bool _show_timer = std::getenv("SHOW_TIMER") != nullptr;
+#ifdef IS_TESTING
+bool _show_timer = true;
+#else
+bool _show_timer = std::getenv("SHOW_TIMER") != nullptr;
+#endif
+
+#define START_TIMER() std::chrono::steady_clock::time_point _timer_start = std::chrono::steady_clock::now();
 #define RECORD_TIME(msg) { if (_show_timer) std::cerr << msg << ": " << since(_timer_start).count() << "ms" << std::endl; _timer_start = std::chrono::steady_clock::now(); }
 
 
