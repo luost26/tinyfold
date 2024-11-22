@@ -36,7 +36,7 @@ inline void apply_rotary_embedding_(matrix<float> &x, int num_heads) {
     }
 }
 
-void attn_proj_linear(const matrix<float> &in, const matrix<float> &weight, const matrix<float> &bias, matrix<float> &out) {
+void attn_proj_linear(const matrix<float> &in, const matrix<float> &weight, const matrix<float> &bias, matrix<float> &out, void *_=nullptr) {
     // in: (seqlen, in_dim)
     // weight: (num_heads * head_dim, in_dim)
     // bias: (num_heads * head_dim, 1)
@@ -60,14 +60,17 @@ void attn_proj_linear(const matrix<float> &in, const matrix<float> &weight, cons
 }
 
 template <int block_size>
-void attn_proj_linear(const matrix<float> &in, const quantized_matrix<Q4, block_size> &weight, const matrix<float> &bias, matrix<float> &out) {
-    matrix<float> *weight_fp32 = new matrix<float>(weight.n_rows, weight.n_cols);
-    weight.dequantize(*weight_fp32);
-    attn_proj_linear(in, *weight_fp32, bias, out);
-    delete weight_fp32;
+void attn_proj_linear(const matrix<float> &in, const quantized_matrix<Q4, block_size> &weight, const matrix<float> &bias, matrix<float> &out, matrix<float> *dequant=nullptr) {
+    if (dequant == nullptr) {
+        throw std::invalid_argument("dequant should not be nullptr");
+    }
+    dequant->n_rows = weight.n_rows;
+    dequant->n_cols = weight.n_cols;
+    weight.dequantize(*dequant);
+    attn_proj_linear(in, *dequant, bias, out);
 }
 
-void attn_out_linear(const matrix<float> &in, const matrix<float> &weight, const matrix<float> &bias, matrix<float> &out) {
+void attn_out_linear(const matrix<float> &in, const matrix<float> &weight, const matrix<float> &bias, matrix<float> &out, void *_=nullptr) {
     // in: (num_heads * seqlen, head_dim)
     // weight: (out_dim, num_heads * head_dim)
     // bias: (out_dim, 1)
@@ -92,11 +95,14 @@ void attn_out_linear(const matrix<float> &in, const matrix<float> &weight, const
 }
 
 template <int block_size>
-void attn_out_linear(const matrix<float> &in, const quantized_matrix<Q4, block_size> &weight, const matrix<float> &bias, matrix<float> &out) {
-    matrix<float> *weight_fp32 = new matrix<float>(weight.n_rows, weight.n_cols);
-    weight.dequantize(*weight_fp32);
-    attn_out_linear(in, *weight_fp32, bias, out);
-    delete weight_fp32;
+void attn_out_linear(const matrix<float> &in, const quantized_matrix<Q4, block_size> &weight, const matrix<float> &bias, matrix<float> &out, matrix<float> *dequant=nullptr) {
+    if (dequant == nullptr) {
+        throw std::invalid_argument("dequant should not be nullptr");
+    }
+    dequant->n_rows = weight.n_rows;
+    dequant->n_cols = weight.n_cols;
+    weight.dequantize(*dequant);
+    attn_out_linear(in, *dequant, bias, out);
 }
 
 template <bool transposed_B = false, typename T>
@@ -134,7 +140,7 @@ void bmm(const matrix<T> &A, const matrix<T> &B, matrix<T> &C) {
     }
 }
 
-void fused_layer_norm_linear_gelu(const matrix<float> &in, const matrix<float> &norm_weight, const matrix<float> &norm_bias, const matrix<float> &linear_weight, const matrix<float> &linear_bias, matrix<float> &out) {
+void fused_layer_norm_linear_gelu(const matrix<float> &in, const matrix<float> &norm_weight, const matrix<float> &norm_bias, const matrix<float> &linear_weight, const matrix<float> &linear_bias, matrix<float> &out, void *_=nullptr) {
     // in: (batch, in_channels)
     // weight: (out_channels, in_channels)
     // norm_weight: (in_channels, 1)
@@ -177,11 +183,14 @@ void fused_layer_norm_linear_gelu(const matrix<float> &in, const matrix<float> &
 }
 
 template <int block_size>
-void fused_layer_norm_linear_gelu(const matrix<float> &in, const matrix<float> &norm_weight, const matrix<float> &norm_bias, const quantized_matrix<Q4, block_size> &linear_weight, const matrix<float> &linear_bias, matrix<float> &out) {
-    matrix<float> *linear_weight_fp32 = new matrix<float>(linear_weight.n_rows, linear_weight.n_cols);
-    linear_weight.dequantize(*linear_weight_fp32);
-    fused_layer_norm_linear_gelu(in, norm_weight, norm_bias, *linear_weight_fp32, linear_bias, out);
-    delete linear_weight_fp32;
+void fused_layer_norm_linear_gelu(const matrix<float> &in, const matrix<float> &norm_weight, const matrix<float> &norm_bias, const quantized_matrix<Q4, block_size> &linear_weight, const matrix<float> &linear_bias, matrix<float> &out, matrix<float> *dequant=nullptr) {
+    if (dequant == nullptr) {
+        throw std::invalid_argument("dequant should not be nullptr");
+    }
+    dequant->n_rows = linear_weight.n_rows;
+    dequant->n_cols = linear_weight.n_cols;
+    linear_weight.dequantize(*dequant);
+    fused_layer_norm_linear_gelu(in, norm_weight, norm_bias, *dequant, linear_bias, out);
 }
 
 template <typename T1, typename T2, typename T3, typename T4>
@@ -214,7 +223,7 @@ void _check_output_linear_residual_shape(const T1 &A, const T2 &B, const T3 &bia
     }
 }
 
-void output_linear_residual(const matrix<float> &A, const matrix<float> &B, const matrix<float> &bias, matrix<float> &C) {
+void output_linear_residual(const matrix<float> &A, const matrix<float> &B, const matrix<float> &bias, matrix<float> &C, void *_=nullptr) {
     // A: (bsz, in_channels)
     // B: (out_channels, in_channels)
     // bias: (out_channels, 1)
@@ -233,11 +242,14 @@ void output_linear_residual(const matrix<float> &A, const matrix<float> &B, cons
 }
 
 template <int block_size>
-void output_linear_residual(const matrix<float> &A, const quantized_matrix<Q4, block_size> &B, const matrix<float> &bias, matrix<float> &C) {
-    matrix<float> *B_fp32 = new matrix<float>(B.n_rows, B.n_cols);
-    B.dequantize(*B_fp32);
-    output_linear_residual(A, *B_fp32, bias, C);
-    delete B_fp32;
+void output_linear_residual(const matrix<float> &A, const quantized_matrix<Q4, block_size> &B, const matrix<float> &bias, matrix<float> &C, matrix<float> *dequant=nullptr) {
+    if (dequant == nullptr) {
+        throw std::invalid_argument("dequant should not be nullptr");
+    }
+    dequant->n_rows = B.n_rows;
+    dequant->n_cols = B.n_cols;
+    B.dequantize(*dequant);
+    output_linear_residual(A, *dequant, bias, C);
 }
 
 template <int block_size>

@@ -156,8 +156,9 @@ struct ESM {
         }
 
         matrix<float> *in_ptr, *out_ptr;
+        auto start = std::chrono::steady_clock::now();
         for (int i = 0; i < std::min(cfg.num_layers, stop_at); i ++) {
-            std::cerr << "Running transformer layer #" << i + 1;
+            std::cerr << "Running transformer layer #" << i + 1 << "/" << cfg.num_layers << " ...";
             if (i % 2 == 0) {
                 in_ptr = &buffer.x;
                 out_ptr = &buffer.y;
@@ -165,19 +166,20 @@ struct ESM {
                 in_ptr = &buffer.y;
                 out_ptr = &buffer.x;
             }
-            auto start = std::chrono::steady_clock::now();
             (*transformer_layers[i])(*in_ptr, *out_ptr, *buffer.transformer_buffer);
             if (i == cfg.num_layers - 1) {
                 layer_norm(*out_ptr, emb_layer_norm_after_weight, emb_layer_norm_after_bias, *out_ptr);
             }
             auto end = std::chrono::steady_clock::now();
             // Report in seconds
-            std::cerr << "... (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0 << "s)" << std::endl;
+            int elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            std::cerr << "(elapsed: " << elapsed_ms / 1000.0 << "s, average: " << (elapsed_ms / (i + 1)) / 1000.0 << "s)" << "\t\r" << std::flush;
             if (repr_out != nullptr) {
                 repr_out->accumulate_s(*out_ptr, i + 1);
                 repr_out->save_z(buffer.transformer_buffer->attn_weights, i);
             }
         }
+        std::cerr << std::endl;
     }
 };
 
@@ -205,14 +207,18 @@ ESM<TransformerWeightType>* load_esm(const std::string &dirpath) {
         transformer_layers.push_back(nullptr);
     }
 
+    int count_loaded = 0;
     #pragma omp parallel for
     for (int i = 0; i < num_layers; i ++) {
         auto *ptr = load_transformer_layer<TransformerWeightType>(get_transformer_layer_path(dirpath, i));
         #pragma omp critical
         {
             transformer_layers[i] = ptr;
+            count_loaded += 1;
+            std::cerr << "Loading transformer layer ..." << "(" << count_loaded << "/" << num_layers << ")\t\r" << std::flush;
         }
     }
+    std::cerr << std::endl;
     ESMConfig esm_cfg(num_layers, embed_dim, attention_heads, transformer_layers[0]->cfg);
     return new ESM(esm_cfg, dirpath, transformer_layers);
 }

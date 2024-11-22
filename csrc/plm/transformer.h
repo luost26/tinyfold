@@ -49,13 +49,16 @@ struct TransformerBuffer {
     matrix<float> attn_weights;
     matrix<float> x1;
 
-    TransformerBuffer(int seqlen, const TransformerConfig &cfg):
+    matrix<float> dequant;
+
+    TransformerBuffer(int seqlen, const TransformerConfig &cfg, int dequant_size = 1):
         seqlen(seqlen),
         cfg(cfg),
         q(cfg.num_heads * seqlen, cfg.head_dim()),
         k(cfg.num_heads * seqlen, cfg.head_dim()),
         attn_weights(cfg.num_heads * seqlen, seqlen),
-        x1(seqlen, cfg.ffn_embed_dim)
+        x1(seqlen, cfg.ffn_embed_dim),
+        dequant(dequant_size, 1)
     {}
 };
 
@@ -142,38 +145,41 @@ struct TransformerLayer {
         load_(fc2_bias, dirpath + "/fc2.bias.bin");
         load_(final_layer_norm_weight, dirpath + "/final_layer_norm.weight.bin");
         load_(final_layer_norm_bias, dirpath + "/final_layer_norm.bias.bin");
-        std::cerr << "Loaded weights for TransformerLayer from " << dirpath << std::endl;
     }
 
     TransformerBuffer * create_buffer(int seqlen) const {
-        return new TransformerBuffer(seqlen, cfg);
-    }
+        int dq_size = 1;
+        dq_size = std::max(dq_size, k_proj_weight.numel());
+        dq_size = std::max(dq_size, v_proj_weight.numel());
+        dq_size = std::max(dq_size, q_proj_weight.numel());
+        dq_size = std::max(dq_size, out_proj_weight.numel());
+        dq_size = std::max(dq_size, fc1_weight.numel());
+        dq_size = std::max(dq_size, fc2_weight.numel());
 
-    void apply_rotary_embedding() {
-
+        return new TransformerBuffer(seqlen, cfg, dq_size);
     }
 
     void operator() (const matrix<float> &x, matrix<float> &y, TransformerBuffer &buffer) {
         START_TIMER();
 
         layer_norm(x, self_attn_layer_norm_weight, self_attn_layer_norm_bias, y); RECORD_TIME("layer_norm");
-        attn_proj_linear(y, q_proj_weight, q_proj_bias, buffer.q); RECORD_TIME("q_proj_linear");
-        attn_proj_linear(y, k_proj_weight, k_proj_bias, buffer.k); RECORD_TIME("k_proj_linear");
+        attn_proj_linear(y, q_proj_weight, q_proj_bias, buffer.q, &buffer.dequant); RECORD_TIME("q_proj_linear");
+        attn_proj_linear(y, k_proj_weight, k_proj_bias, buffer.k, &buffer.dequant); RECORD_TIME("k_proj_linear");
         apply_rotary_embedding_(buffer.q, cfg.num_heads); RECORD_TIME("apply_rotary_embedding");
         apply_rotary_embedding_(buffer.k, cfg.num_heads); RECORD_TIME("apply_rotary_embedding");
         bmm<true>(buffer.q, buffer.k, buffer.attn_weights); RECORD_TIME("bmm");
         softmax_(buffer.attn_weights); RECORD_TIME("softmax");
 
-        attn_proj_linear(y, v_proj_weight, v_proj_bias, buffer.k);  // Use k buffer to save memory
+        attn_proj_linear(y, v_proj_weight, v_proj_bias, buffer.k, &buffer.dequant);  // Use k buffer to save memory
         RECORD_TIME("v_proj_linear");
         bmm<false>(buffer.attn_weights, buffer.k, buffer.q);  // Use q buffer to save memory
         RECORD_TIME("bmm");
         
-        attn_out_linear(buffer.q, out_proj_weight, out_proj_bias, y); RECORD_TIME("attn_out_linear");
+        attn_out_linear(buffer.q, out_proj_weight, out_proj_bias, y, &buffer.dequant); RECORD_TIME("attn_out_linear");
         add_(y, x); RECORD_TIME("add");
 
-        fused_layer_norm_linear_gelu(y, final_layer_norm_weight, final_layer_norm_bias, fc1_weight, fc1_bias, buffer.x1); RECORD_TIME("fused_layer_norm_linear");
-        output_linear_residual(buffer.x1, fc2_weight, fc2_bias, y); RECORD_TIME("linear_residual");
+        fused_layer_norm_linear_gelu(y, final_layer_norm_weight, final_layer_norm_bias, fc1_weight, fc1_bias, buffer.x1, &buffer.dequant); RECORD_TIME("fused_layer_norm_linear");
+        output_linear_residual(buffer.x1, fc2_weight, fc2_bias, y, &buffer.dequant); RECORD_TIME("linear_residual");
     }
 };
 
