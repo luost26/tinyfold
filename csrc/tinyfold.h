@@ -8,13 +8,14 @@
 #include "folding/structure_module.h"
 #include "matrix.h"
 
+template <typename ESMTransformerWeightType>
 struct TinyFold {
-    std::unique_ptr<ESM_fp32> esm;
+    std::unique_ptr<ESM<ESMTransformerWeightType>> esm;
     std::unique_ptr<matrix<float>> esm_s_combine_normalized;
     std::unique_ptr<Adaptor> adaptor;
     std::unique_ptr<StructureModule> structure_module;
 
-    TinyFold(ESM_fp32 *esm, matrix<float> *esm_s_combine_normalized, Adaptor *adaptor, StructureModule *structure_module):
+    TinyFold(ESM<ESMTransformerWeightType> *esm, matrix<float> *esm_s_combine_normalized, Adaptor *adaptor, StructureModule *structure_module):
         esm(esm),
         esm_s_combine_normalized(esm_s_combine_normalized),
         adaptor(adaptor),
@@ -42,8 +43,9 @@ struct TinyFold {
     }
 };
 
-TinyFold * load_tinyfold(const std::string &dirpath) {
-    ESM_fp32 *esm = load_esm(dirpath + "/esm");
+template <typename ESMTransformerWeightType>
+TinyFold<ESMTransformerWeightType> * load_tinyfold(const std::string &dirpath) {
+    ESM<ESMTransformerWeightType> *esm = load_esm<ESMTransformerWeightType>(dirpath + "/esm");
     matrix<float> *esm_s_combine_normalized = new matrix<float>(dirpath + "/esm_s_combine_normalized.bin", esm->cfg.num_layers + 1, 1);
     Adaptor *adaptor = load_adaptor(dirpath + "/folding/adaptor");
     StructureModule *structure_module = load_structure_module(dirpath + "/folding/structure_module");

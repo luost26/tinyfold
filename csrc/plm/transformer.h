@@ -60,6 +60,28 @@ struct TransformerBuffer {
 };
 
 
+void smart_load_(matrix<float> & A, const std::string & path) {
+    load_(A, path);
+}
+
+template <int block_size>
+void smart_load_(quantized_matrix<Q4, block_size> & A, const std::string & path) {
+    std::string path_trunk = path.substr(0, path.size() - 4);
+    std::string metadata_path = path_trunk + QMATRIX_META_SUFFIX;
+
+    std::ifstream qmeta_file(metadata_path);
+    if (qmeta_file.good()) {
+        // If quantization metadata file exists, directly load it
+        load_(A, metadata_path);
+    } else {
+        // Otherwise, load the full-precision matrix and quantize it
+        matrix<float> *temp = new matrix<float>(A.n_rows, A.n_cols);
+        load_(*temp, path);
+        quantize(*temp, &A);
+        delete temp;
+    }
+}
+
 template <typename WeightType=matrix<float>>
 struct TransformerLayer {
     TransformerConfig cfg;
@@ -103,20 +125,20 @@ struct TransformerLayer {
     {
         load_(self_attn_layer_norm_weight, dirpath + "/self_attn_layer_norm.weight.bin");
         load_(self_attn_layer_norm_bias, dirpath + "/self_attn_layer_norm.bias.bin");
-        load_(k_proj_weight, dirpath + "/self_attn.k_proj.weight.bin");
+        smart_load_(k_proj_weight, dirpath + "/self_attn.k_proj.weight.bin");
         load_(k_proj_bias, dirpath + "/self_attn.k_proj.bias.bin");
-        load_(v_proj_weight, dirpath + "/self_attn.v_proj.weight.bin");
+        smart_load_(v_proj_weight, dirpath + "/self_attn.v_proj.weight.bin");
         load_(v_proj_bias, dirpath + "/self_attn.v_proj.bias.bin");
-        load_(q_proj_weight, dirpath + "/self_attn.q_proj.weight.bin");
+        smart_load_(q_proj_weight, dirpath + "/self_attn.q_proj.weight.bin");
         load_(q_proj_bias, dirpath + "/self_attn.q_proj.bias.bin");
         mul_(q_proj_weight, 1.0f / sqrtf(cfg.head_dim()));
         mul_(q_proj_bias, 1.0f / sqrtf(cfg.head_dim()));
 
-        load_(out_proj_weight, dirpath + "/self_attn.out_proj.weight.bin");
+        smart_load_(out_proj_weight, dirpath + "/self_attn.out_proj.weight.bin");
         load_(out_proj_bias, dirpath + "/self_attn.out_proj.bias.bin");
-        load_(fc1_weight, dirpath + "/fc1.weight.bin");
+        smart_load_(fc1_weight, dirpath + "/fc1.weight.bin");
         load_(fc1_bias, dirpath + "/fc1.bias.bin");
-        load_(fc2_weight, dirpath + "/fc2.weight.bin");
+        smart_load_(fc2_weight, dirpath + "/fc2.weight.bin");
         load_(fc2_bias, dirpath + "/fc2.bias.bin");
         load_(final_layer_norm_weight, dirpath + "/final_layer_norm.weight.bin");
         load_(final_layer_norm_bias, dirpath + "/final_layer_norm.bias.bin");
@@ -155,11 +177,13 @@ struct TransformerLayer {
     }
 };
 
+typedef matrix<float> Weight_FP32;
+typedef quantized_matrix<Q4, 128> Weight_Q4;
 
-TransformerLayer<matrix<float>> * load_transformer_layer(const std::string &dirpath) {
+template <typename WeightType>
+TransformerLayer<WeightType> * load_transformer_layer(const std::string &dirpath) {
     TransformerConfig cfg(dirpath + "/config.txt");
-    return new TransformerLayer(cfg, dirpath);
+    return new TransformerLayer<WeightType>(cfg, dirpath);
 }
-
 
 #endif // PLM_TRANSFORMER_H

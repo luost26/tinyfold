@@ -57,6 +57,10 @@ struct quantized_matrix {
         return n_rows * n_cols;
     }
 
+    int num_blocks() const {
+        return (n_rows * n_cols) / block_size;
+    }
+
     inline int group_index(int row, int col) const {
         return (row * n_cols + col) / block_size;
     }
@@ -174,6 +178,24 @@ quantized_matrix<num_bits, block_size>* quantize(const matrix<float> &A, quantiz
         }
     }
     return q_matrix;
+}
+
+
+const std::string QMATRIX_META_SUFFIX = ".qmeta";
+
+template <NumBits num_bits, int block_size>
+void load_(quantized_matrix<num_bits, block_size> & A, const std::string & metadata_path) {
+    std::string path_trunk = metadata_path.substr(0, metadata_path.size() - 6);  // Suffix: .qmeta
+    // Not implemented
+    throw std::runtime_error("Not implemented");
+}
+
+template <NumBits num_bits, int block_size>
+inline void mul_(quantized_matrix<num_bits, block_size> &A, float b) {
+    int num_blocks = A.num_blocks();
+    for (int i = 0; i < num_blocks; i++) {
+        A.scales[i] *= b;
+    }
 }
 
 template <NumBits num_bits, int block_size>

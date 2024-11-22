@@ -36,8 +36,7 @@ inline void apply_rotary_embedding_(matrix<float> &x, int num_heads) {
     }
 }
 
-template <typename T>
-void attn_proj_linear(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias, matrix<T> &out) {
+void attn_proj_linear(const matrix<float> &in, const matrix<float> &weight, const matrix<float> &bias, matrix<float> &out) {
     // in: (seqlen, in_dim)
     // weight: (num_heads * head_dim, in_dim)
     // bias: (num_heads * head_dim, 1)
@@ -51,7 +50,7 @@ void attn_proj_linear(const matrix<T> &in, const matrix<T> &weight, const matrix
         const int head_idx = i / seqlen;
         const int seq_idx = i % seqlen;
         for (int j = 0; j < head_dim; j ++) {
-            T sum = *bias(head_idx * head_dim + j, 0);
+            float sum = *bias(head_idx * head_dim + j, 0);
             for (int k = 0; k < in_dim; k ++) {
                 sum += *in(seq_idx, k) * *weight(head_idx * head_dim + j, k);
             }
@@ -60,8 +59,15 @@ void attn_proj_linear(const matrix<T> &in, const matrix<T> &weight, const matrix
     }
 }
 
-template <typename T>
-void attn_out_linear(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias, matrix<T> &out) {
+template <int block_size>
+void attn_proj_linear(const matrix<float> &in, const quantized_matrix<Q4, block_size> &weight, const matrix<float> &bias, matrix<float> &out) {
+    matrix<float> *weight_fp32 = new matrix<float>(weight.n_rows, weight.n_cols);
+    weight.dequantize(*weight_fp32);
+    attn_proj_linear(in, *weight_fp32, bias, out);
+    delete weight_fp32;
+}
+
+void attn_out_linear(const matrix<float> &in, const matrix<float> &weight, const matrix<float> &bias, matrix<float> &out) {
     // in: (num_heads * seqlen, head_dim)
     // weight: (out_dim, num_heads * head_dim)
     // bias: (out_dim, 1)
@@ -74,7 +80,7 @@ void attn_out_linear(const matrix<T> &in, const matrix<T> &weight, const matrix<
     #pragma omp parallel for
     for (int i = 0; i < seqlen; i ++) {
         for (int j =0; j < out_dim; j ++) {
-            T sum = *bias(j, 0);
+            float sum = *bias(j, 0);
             for (int k = 0; k < num_heads * head_dim; k ++) {
                 const int head_idx = k / head_dim;
                 const int dim_idx = k % head_dim;
@@ -83,6 +89,14 @@ void attn_out_linear(const matrix<T> &in, const matrix<T> &weight, const matrix<
             *out(i, j) = sum;
         }
     }
+}
+
+template <int block_size>
+void attn_out_linear(const matrix<float> &in, const quantized_matrix<Q4, block_size> &weight, const matrix<float> &bias, matrix<float> &out) {
+    matrix<float> *weight_fp32 = new matrix<float>(weight.n_rows, weight.n_cols);
+    weight.dequantize(*weight_fp32);
+    attn_out_linear(in, *weight_fp32, bias, out);
+    delete weight_fp32;
 }
 
 template <bool transposed_B = false, typename T>
@@ -120,9 +134,7 @@ void bmm(const matrix<T> &A, const matrix<T> &B, matrix<T> &C) {
     }
 }
 
-
-template <typename T>
-void fused_layer_norm_linear_gelu(const matrix<T> &in, const matrix<T> &norm_weight, const matrix<T> &norm_bias, const matrix<T> &linear_weight, const matrix<T> &linear_bias, matrix<T> &out) {
+void fused_layer_norm_linear_gelu(const matrix<float> &in, const matrix<float> &norm_weight, const matrix<float> &norm_bias, const matrix<float> &linear_weight, const matrix<float> &linear_bias, matrix<float> &out) {
     // in: (batch, in_channels)
     // weight: (out_channels, in_channels)
     // norm_weight: (in_channels, 1)
@@ -135,22 +147,22 @@ void fused_layer_norm_linear_gelu(const matrix<T> &in, const matrix<T> &norm_wei
 
     #pragma omp parallel for
     for (int i = 0; i < bsz; i ++) {
-        T mean = 0;
+        float mean = 0;
         for (int j = 0; j < in_channels; j ++) {
             mean += *in(i, j);
         }
         mean /= in_channels;
 
-        T var = 0;
+        float var = 0;
         for (int j = 0; j < in_channels; j ++) {
-            T diff = *in(i, j) - mean;
+            float diff = *in(i, j) - mean;
             var += diff * diff;
         }
         var /= in_channels;
-        T inv_std = 1.0f / sqrt(var + 1e-5f);
+        float inv_std = 1.0f / sqrt(var + 1e-5f);
 
         for (int j = 0; j < out_channels; j ++) {
-            T sum = *linear_bias(j, 0);
+            float sum = *linear_bias(j, 0);
             for (int k = 0; k < in_channels; k ++) {
                 auto in_0 = *in(i, k);
                 auto nw_0 = *norm_weight(k, 0);
@@ -162,6 +174,14 @@ void fused_layer_norm_linear_gelu(const matrix<T> &in, const matrix<T> &norm_wei
             *out(i, j) = sum;
         }
     }
+}
+
+template <int block_size>
+void fused_layer_norm_linear_gelu(const matrix<float> &in, const matrix<float> &norm_weight, const matrix<float> &norm_bias, const quantized_matrix<Q4, block_size> &linear_weight, const matrix<float> &linear_bias, matrix<float> &out) {
+    matrix<float> *linear_weight_fp32 = new matrix<float>(linear_weight.n_rows, linear_weight.n_cols);
+    linear_weight.dequantize(*linear_weight_fp32);
+    fused_layer_norm_linear_gelu(in, norm_weight, norm_bias, *linear_weight_fp32, linear_bias, out);
+    delete linear_weight_fp32;
 }
 
 template <typename T1, typename T2, typename T3, typename T4>

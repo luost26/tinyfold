@@ -186,10 +186,11 @@ std::string get_transformer_layer_path(const std::string &dirpath, int layer) {
 }
 
 
-typedef ESM<matrix<float>> ESM_fp32;
+typedef ESM<Weight_FP32> ESM_fp32;
 
 
-ESM<matrix<float>> * load_esm(const std::string &dirpath) {
+template <typename TransformerWeightType>
+ESM<TransformerWeightType>* load_esm(const std::string &dirpath) {
     int num_layers, embed_dim, attention_heads;
     std::ifstream cfg_file(dirpath + "/config.txt");
     if (!cfg_file.is_open())
@@ -199,14 +200,14 @@ ESM<matrix<float>> * load_esm(const std::string &dirpath) {
     }
     cfg_file >> num_layers >> embed_dim >> attention_heads;
 
-    std::vector<TransformerLayer<matrix<float>> *> transformer_layers;
+    std::vector<TransformerLayer<TransformerWeightType> *> transformer_layers;
     for (int i = 0; i < num_layers; i ++) {
         transformer_layers.push_back(nullptr);
     }
 
     #pragma omp parallel for
     for (int i = 0; i < num_layers; i ++) {
-        auto *ptr = load_transformer_layer(get_transformer_layer_path(dirpath, i));
+        auto *ptr = load_transformer_layer<TransformerWeightType>(get_transformer_layer_path(dirpath, i));
         #pragma omp critical
         {
             transformer_layers[i] = ptr;
