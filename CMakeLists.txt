@@ -3,21 +3,28 @@ project(tinyfold)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(IS_ARM CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+set(IS_X86 CMAKE_SYSTEM_PROCESSOR MATCHES "x86")
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+if(IS_ARM)
     set(CMAKE_CXX_FLAGS "-O3 -funroll-loops -march=native -fPIC -march=armv8.2-a+dotprod")
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86")
+elseif(IS_X86)
     set(CMAKE_CXX_FLAGS "-O3 -funroll-loops -mavx2 -mfma -ffast-math -fpermissive")
 else()
-  message(STATUS "Building for unknown architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+    message(STATUS "Building for unknown architecture: ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
 set(PROJECT_SOURCE_DIR ${CMAKE_SOURCE_DIR}/csrc)
 
-find_package(OpenMP)
-
 add_executable(main ${PROJECT_SOURCE_DIR}/main.cpp)
-target_link_libraries(main OpenMP::OpenMP_CXX)
-
 add_executable(test ${PROJECT_SOURCE_DIR}/test.cpp)
-target_link_libraries(test OpenMP::OpenMP_CXX)
+
+if(APPLE)
+    include_directories("/opt/homebrew/opt/libomp/include")
+    target_link_libraries(main "/opt/homebrew/opt/libomp/lib/libomp.dylib")
+    target_link_libraries(test "/opt/homebrew/opt/libomp/lib/libomp.dylib")
+else()
+    find_package(OpenMP)
+    target_link_libraries(main OpenMP::OpenMP_CXX)
+    target_link_libraries(test OpenMP::OpenMP_CXX)
+endif()
