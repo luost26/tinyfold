@@ -7,23 +7,23 @@ import torch
 import torch.nn as nn
 from torch.nn import LayerNorm, Linear
 
-from efficient_esm.models.openfold.feats import (
+from tinyfold.models.openfold.feats import (
     frames_and_literature_positions_to_atom14_pos,
     torsion_angles_to_frames,
 )
-from efficient_esm.models.openfold.residue_constants import (
+from tinyfold.models.openfold.residue_constants import (
     restype_atom14_mask,
     restype_atom14_rigid_group_positions,
     restype_atom14_to_rigid_group,
     restype_rigid_group_default_frame,
 )
-from efficient_esm.models.openfold.rigid_utils import Rigid, Rotation
-from efficient_esm.models.openfold.tensor_utils import (
+from tinyfold.models.openfold.rigid_utils import Rigid, Rotation
+from tinyfold.models.openfold.tensor_utils import (
     dict_multimap,
     flatten_final_dims,
     permute_final_dims,
 )
-from efficient_esm.utils.export import export_tensor_dict, export_value_list
+from tinyfold.utils.export import export_tensor_dict, export_value_list
 
 
 class AngleResnetBlock(nn.Module):

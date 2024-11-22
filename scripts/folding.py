@@ -3,7 +3,7 @@ import torch
 import pathlib
 from matplotlib import pyplot as plt
 
-from efficient_esm.models.esmfold import ESMFold
+from tinyfold.models.esmfold import ESMFold
 
 
 @click.command()

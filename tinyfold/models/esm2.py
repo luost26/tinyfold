@@ -5,8 +5,8 @@ import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
 
-from efficient_esm.data.alphabet import Alphabet
-from efficient_esm.utils.export import export_tensor_dict, export_value_list
+from tinyfold.data.alphabet import Alphabet
+from tinyfold.utils.export import export_tensor_dict, export_value_list
 
 from .heads import ContactPredictionHead, RobertaLMHead
 from .transformer import TransformerLayer

@@ -11,8 +11,8 @@ import torch
 import torch.nn as nn
 from torch.nn import LayerNorm
 
-from efficient_esm.data.alphabet import Alphabet
-from efficient_esm.utils.export import export_tensor_dict, export_value_list
+from tinyfold.data.alphabet import Alphabet
+from tinyfold.utils.export import export_tensor_dict, export_value_list
 
 from .esm2 import ESM2
 from .esm_misc import batch_encode_sequences, collate_dense_tensors, output_to_pdb

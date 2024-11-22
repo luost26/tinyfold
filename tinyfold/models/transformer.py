@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from efficient_esm.utils.export import export_tensor_dict, export_value_list
+from tinyfold.utils.export import export_tensor_dict, export_value_list
 
 
 def rotate_half(x):

@@ -3,15 +3,15 @@ import random
 import sys
 from pathlib import Path
 
-from efficient_esm.models.structure_module import InvariantPointAttention, Rigid, StructureModule
-from efficient_esm.models.esmfold import ESMFold
-from efficient_esm.models.openfold import residue_constants
-from efficient_esm.models.transformer import TransformerLayer
-from efficient_esm.utils.export import export_tensor_dict
-from efficient_esm.utils.quantize import pseudo_quantize_tensor
-from efficient_esm.models.esm2 import ESM2
-from efficient_esm.models.esm_misc import batch_encode_sequences
-from efficient_esm.data.alphabet import Alphabet
+from tinyfold.models.structure_module import InvariantPointAttention, Rigid, StructureModule
+from tinyfold.models.esmfold import ESMFold
+from tinyfold.models.openfold import residue_constants
+from tinyfold.models.transformer import TransformerLayer
+from tinyfold.utils.export import export_tensor_dict
+from tinyfold.utils.quantize import pseudo_quantize_tensor
+from tinyfold.models.esm2 import ESM2
+from tinyfold.models.esm_misc import batch_encode_sequences
+from tinyfold.data.alphabet import Alphabet
 
 torch.set_grad_enabled(False)
 
