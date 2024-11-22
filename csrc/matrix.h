@@ -288,6 +288,7 @@ void load_(matrix<T> & A, const std::string & path) {
     }
     track_load(path);
     std::ignore = fread(A.data, sizeof(T), A.n_rows * A.n_cols, f);
+    fclose(f);
 }
 
 
