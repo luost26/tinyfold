@@ -6,6 +6,7 @@
 #include "plm/esm.h"
 #include "folding/adaptor.h"
 #include "folding/structure_module.h"
+#include "folding/to_pdb.h"
 #include "matrix.h"
 
 template <typename ESMTransformerWeightType>
@@ -40,7 +41,6 @@ struct TinyFold {
         (*structure_module)(adaptor_buffer->sm_s, adaptor_buffer->z, *sm_buffer);
 
         std::string pdb_out = to_pdb(sm_buffer->r, folding_aatype);
-        std::cout << "PDB output: \n" << pdb_out << std::endl;
         return pdb_out;
     }
 };

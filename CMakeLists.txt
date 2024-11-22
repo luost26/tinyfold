@@ -11,3 +11,6 @@ find_package(OpenMP)
 
 add_executable(main ${PROJECT_SOURCE_DIR}/main.cpp)
 target_link_libraries(main OpenMP::OpenMP_CXX)
+
+add_executable(test ${PROJECT_SOURCE_DIR}/test.cpp)
+target_link_libraries(test OpenMP::OpenMP_CXX)

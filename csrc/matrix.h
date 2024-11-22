@@ -23,7 +23,7 @@ struct matrix
 
     matrix(const matrix &A) : n_rows(A.n_rows), n_cols(A.n_cols)
     {
-        std::cout << "Copy constructor: " << A.n_rows << " " << A.n_cols << std::endl;
+        // std::cerr << "Copy constructor: " << A.n_rows << " " << A.n_cols << std::endl;
         data = new T[n_rows * n_cols];
         for (int i = 0; i < n_rows * n_cols; i++)
         {

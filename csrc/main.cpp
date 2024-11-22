@@ -1,34 +1,31 @@
-#include <iostream>
-#include "folding/ipa_test.h"
-#include "folding/structure_module_test.h"
-#include "folding/adaptor_test.h"
-#include "folding/test.h"
-#include "plm/transformer_test.h"
-#include "plm/transformer_kernels_test.h"
-#include "plm/esm_test.h"
+#include <filesystem>
 #include "tinyfold.h"
-#include "matrix_q.h"
-#include "matrix_q_test.h"
-#include "utils/pseudo_quant.h"
-#include "utils/pseudo_quant_test.h"
 
-int main() {
-    // test_ipa();
-    // test_affine_quat_conversion();
-    // test_structure_module();
-    // test_adaptor();
-    // test_folding();
-    // test_transformer();
-    // test_esm_small();
-    // test_esm_full_3B();
-    // benchmark_transformer();
-    // test_pseudo_quantize();
-    // test_quantize_4bit();
-    // test_output_linear_residual_W4A32();
-    // return 0;
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <model_dir>" << std::endl;
+        return 1;
+    }
+    std::string model_dir(argv[1]);
+    std::unique_ptr<TinyFold<Weight_Q4>> tinyfold(load_tinyfold<Weight_Q4>(model_dir));
 
-    std::unique_ptr<TinyFold<Weight_Q4>> tinyfold(load_tinyfold<Weight_Q4>("../data/c_test/esmfold"));
-    std::string seq("ASAWPEEKNYHQPAILNSSALRQIAEGTSISEMWQNDLQPLLIERYPGSPGSYAARQHIMQRIQRLQADWVLEIDTFLSQTPYGYRSFSNIISTLNPTAKRHLVLACHYDSKYFSHWNNRVFVGATDS");
-    tinyfold->operator()(seq);
+    // Make `output` directory if it doesn't exist
+    std::filesystem::create_directory("output");
+
+    for (int i = 0;;i ++) {
+        std::string out_filename = "output/" + std::to_string(i).insert(0, 4 - std::to_string(i).length(), '0') + ".pdb";
+        // If the output file already exists, skip
+        if (std::filesystem::exists(out_filename)) {
+            continue;
+        }
+        std::string seq;
+        std::cout << "SEQ: ";
+        std::cin >> seq;
+        std::string pdb = tinyfold->operator()(seq);
+        std::ofstream out(out_filename);
+        out << pdb;
+        out.close();
+        std::cout << "Saved to " << out_filename << std::endl;
+    }
     return 0;
 }
