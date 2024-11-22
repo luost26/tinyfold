@@ -3,7 +3,14 @@ project(folddotc)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_FLAGS "-O3 -funroll-loops -mavx2 -mfma -ffast-math -fpermissive")
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+    set(CMAKE_CXX_FLAGS "-O3 -funroll-loops -march=native -fPIC -march=armv8.2-a+dotprod")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86")
+    set(CMAKE_CXX_FLAGS "-O3 -funroll-loops -mavx2 -mfma -ffast-math -fpermissive")
+else()
+  message(STATUS "Building for unknown architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
 
 set(PROJECT_SOURCE_DIR ${CMAKE_SOURCE_DIR}/csrc)
 
