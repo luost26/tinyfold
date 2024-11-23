@@ -15,7 +15,7 @@ from tinyfold.models.esmfold import ESMFold
     type=click.Path(exists=True),
     default="./data/esmfold_structure_module_only_3B.pt",
 )
-@click.option("output_dir", "--out", type=click.Path(path_type=pathlib.Path), required=True)
+@click.option("output_dir", "--out", type=click.Path(path_type=pathlib.Path), default="./data/output")
 def main(esm_path: str, esmfold_path: str, device: str, output_dir: pathlib.Path):
     output_dir.mkdir(parents=True, exist_ok=True)
 
