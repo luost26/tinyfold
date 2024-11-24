@@ -15,8 +15,13 @@ int main(int argc, char **argv) {
         std::cerr << "Usage: " << argv[0] << " <in_weights> <out_weights>" << std::endl;
         return 1;
     }
-    init_load_tracker();
     std::string model_dir(argv[1]);
+    
+    // If the model is not quantized, we need to load it once to quantize it
+    TinyFold<Weight_Q4> *tinyfold_first = load_tinyfold<Weight_Q4>(model_dir);
+    delete tinyfold_first;
+
+    init_load_tracker();
     std::unique_ptr<TinyFold<Weight_Q4>> tinyfold(load_tinyfold<Weight_Q4>(model_dir));
 
     std::string out_dir(argv[2]);
