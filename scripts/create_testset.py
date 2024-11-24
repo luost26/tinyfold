@@ -64,6 +64,8 @@ def main(
                         continue
                     out.append(data)
                     pbar.update(1)
+                    if len(out) >= limit:
+                        break
                 except KeyError:
                     print(f"{scop_id} not found in pkl.tar.gz, ignoring")
                     continue
