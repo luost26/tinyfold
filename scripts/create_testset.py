@@ -55,6 +55,8 @@ def main(split_by: str, split_index: int, split_path: Path, pkl_path: Path, outp
     with open(output_path, "wb") as f:
         pickle.dump(out, f)
 
+    print(f"Saved to {output_path}")
+
 
 if __name__ == "__main__":
     main()
