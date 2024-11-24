@@ -35,6 +35,7 @@ def main(split_by: str, split_index: int, split_path: Path, pkl_path: Path, outp
         scop_ids = f.extractfile(f"splits/{split_by}/{split_index}/valid.txt").read().decode().splitlines()
     print("Number of all data points:", len(scop_ids))
     scop_ids = scop_ids[:limit]
+    print("Number of data points to be exported:", len(scop_ids))
 
     output_path = output_root / f"testset/{split_by}_{split_index}.pkl"
     if output_path.exists():
