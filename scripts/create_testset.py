@@ -29,7 +29,7 @@ def get_pickle_path_by_scop_id(scop_id: str) -> str:
     default="./data",
 )
 @click.option("--limit", default=100, type=int)
-@click.option("--length-limit", default=1000, type=int)
+@click.option("--length-limit", default=384, type=int)
 def main(
     split_by: str,
     split_index: int,
