@@ -332,7 +332,7 @@ class TransformerLayer(nn.Module):
     def export(self, dirpath: str | Path) -> None:
         dirpath = Path(dirpath)
         export_tensor_dict(self.state_dict(), dirpath)
-        torch.save(self.state_dict(), dirpath / "state_dict.pt")
+        # torch.save(self.state_dict(), dirpath / "state_dict.pt")
         export_value_list(
             [
                 self.embed_dim,

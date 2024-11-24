@@ -210,7 +210,7 @@ class InvariantPointAttention(nn.Module):
     def export(self, dirpath: str | Path) -> None:
         dirpath = Path(dirpath)
         export_tensor_dict(self.state_dict(), dirpath)
-        torch.save(self.state_dict(), dirpath / "state_dict.pt")
+        # torch.save(self.state_dict(), dirpath / "state_dict.pt")
         export_value_list(
             [self.c_s, self.c_z, self.c_hidden, self.no_heads, self.no_qk_points, self.no_v_points],
             dirpath / "config.txt",
@@ -793,7 +793,7 @@ class StructureModule(nn.Module):
         self.ipa.export(dirpath / "ipa")
         sd = {k: v for k, v in self.state_dict().items() if not k.startswith("ipa.")}
         export_tensor_dict(sd, dirpath)
-        torch.save(sd, dirpath / "state_dict.pt")
+        # torch.save(sd, dirpath / "state_dict.pt")
         export_value_list(
             [
                 self.c_s,

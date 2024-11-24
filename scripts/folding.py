@@ -7,7 +7,7 @@ from tinyfold.models.esmfold import ESMFold
 
 
 @click.command()
-@click.option("--device", default="cuda")
+@click.option("--device", default="cpu")
 @click.option("esm_path", "--esm", type=click.Path(exists=True), default="./data/esm2_t36_3B_UR50D.pt")
 @click.option(
     "esmfold_path",
