@@ -29,13 +29,22 @@ def get_pickle_path_by_scop_id(scop_id: str) -> str:
     default="./data",
 )
 @click.option("--limit", default=100, type=int)
-def main(split_by: str, split_index: int, split_path: Path, pkl_path: Path, output_root: Path, limit: int):
+@click.option("--length-limit", default=1000, type=int)
+def main(
+    split_by: str,
+    split_index: int,
+    split_path: Path,
+    pkl_path: Path,
+    output_root: Path,
+    limit: int,
+    length_limit: int,
+):
     # Load splits/{split_by}/{split_index}/valid.txt in splits.tar.gz
     with tarfile.open(split_path, "r:gz") as f:
         scop_ids = f.extractfile(f"splits/{split_by}/{split_index}/valid.txt").read().decode().splitlines()
     print("Number of all data points:", len(scop_ids))
-    scop_ids = scop_ids[:limit]
-    print("Number of data points to be exported:", len(scop_ids))
+    print("Max number of data points to export:", limit)
+    print("Length limit:", length_limit)
 
     output_path = output_root / f"testset/{split_by}_{split_index}.pkl"
     if output_path.exists():
@@ -43,14 +52,21 @@ def main(split_by: str, split_index: int, split_path: Path, pkl_path: Path, outp
 
     out = []
     with tarfile.open("./data/pkl.tar.gz", "r:gz") as f:
-        for scop_id in tqdm(scop_ids):
-            try:
-                pkl_path = get_pickle_path_by_scop_id(scop_id)
-                pkl = f.extractfile(pkl_path).read()
-                out.append(pickle.loads(pkl))
-            except KeyError:
-                print(f"{scop_id} not found in pkl.tar.gz")
-                continue
+        pbar = tqdm(total=limit)
+        with pbar:
+            for scop_id in scop_ids:
+                try:
+                    pkl_path = get_pickle_path_by_scop_id(scop_id)
+                    pkl = f.extractfile(pkl_path).read()
+                    data = pickle.loads(pkl)
+                    if len(data["seq"]) > length_limit:
+                        print(f"{scop_id} is too long, ignoring")
+                        continue
+                    out.append(data)
+                    pbar.update(1)
+                except KeyError:
+                    print(f"{scop_id} not found in pkl.tar.gz, ignoring")
+                    continue
 
     with open(output_path, "wb") as f:
         pickle.dump(out, f)
