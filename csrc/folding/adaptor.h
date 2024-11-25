@@ -163,8 +163,12 @@ struct Adaptor {
         }
 
         // esm_z_mlp
-        fused_layer_norm_linear<ReLU>(esm_z, esm_z_mlp_0_layernorm_weight, esm_z_mlp_0_layernorm_bias, esm_z_mlp_1_linear_weight, esm_z_mlp_1_linear_bias, buffer.z);
-        linear_(buffer.z, esm_z_mlp_3_linear_weight, esm_z_mlp_3_linear_bias, &buffer.z_inplace_buffer);
+        if (esm_z.n_cols == cfg.esm_attns) {
+            fused_layer_norm_linear<ReLU>(esm_z, esm_z_mlp_0_layernorm_weight, esm_z_mlp_0_layernorm_bias, esm_z_mlp_1_linear_weight, esm_z_mlp_1_linear_bias, buffer.z);
+            linear_(buffer.z, esm_z_mlp_3_linear_weight, esm_z_mlp_3_linear_bias, &buffer.z_inplace_buffer);
+        } else if (esm_z.n_cols == cfg.c_z) {
+            linear(esm_z, esm_z_mlp_3_linear_weight, esm_z_mlp_3_linear_bias, buffer.z);
+        }
 
         // No recycling
         for (int i = 0; i < buffer.s.n_rows; i ++) {
