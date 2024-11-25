@@ -228,6 +228,15 @@ inline void zero_(matrix<T> & A) {
 }
 
 
+inline void rand_(matrix<float> & A) {
+    for (int i = 0; i < A.n_rows; i++) {
+        for (int j = 0; j < A.n_cols; j++) {
+            *A(i, j) = (float)rand() / RAND_MAX;
+        }
+    }
+}
+
+
 template <typename T>
 inline void add_(matrix<T> &A, const matrix<T> &B) {
     for (int i = 0; i < A.n_rows; i++) {
