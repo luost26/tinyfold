@@ -49,6 +49,8 @@ def main(
     output_path = output_root / f"testset/{split_by}_{split_index}.pkl"
     if output_path.exists():
         click.confirm(f"{output_path} already exists. Overwrite?", abort=True)
+    else:
+        output_path.mkdir(parents=True, exist_ok=True)
 
     out = []
     with tarfile.open("./data/pkl.tar.gz", "r:gz") as f:
