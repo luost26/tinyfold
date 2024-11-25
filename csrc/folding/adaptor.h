@@ -117,6 +117,12 @@ struct Adaptor {
         trunk_trunk2sm_z_weight(cfg.sm_c_z, cfg.c_z),
         trunk_trunk2sm_z_bias(cfg.sm_c_z, 1)
     {
+        if (cfg.c_z == cfg.esm_attns) {
+            std::cerr << "Adaptor: c_z cannot be the same as esm_attns, "
+                        << "because the adaptor relies on the number of dims to determine whether we are in memory saving mode"
+                        << std::endl;
+            exit(1);
+        }
         std::cerr << "Loading weights for Adaptor from " << dirpath << std::endl;
         load_(esm_s_mlp_0_layernorm_weight, dirpath + "/esm_s_mlp.0.weight.bin");
         load_(esm_s_mlp_0_layernorm_bias, dirpath + "/esm_s_mlp.0.bias.bin");
