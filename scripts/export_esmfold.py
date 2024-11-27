@@ -36,8 +36,8 @@ def get_calib_feat(data_path: str, model: ESMFold):
     hooks = []
     for name, m in model.named_modules():
         if isinstance(m, nn.Linear):
-            # only do awq for kqv projection in all transformer layers except the first one
-            if any(kqv in name for kqv in [".k", ".q", ".v"]) and ".0" not in name:
+            # only do AWQ for qkv projection in all transformer layers except the first one
+            if any(qkv in name for qkv in [".q", ".k", ".v"]) and ".0" not in name:
                 hooks.append(
                     m.register_forward_hook(
                         partial(stat_input_max_hook, name=name)))
