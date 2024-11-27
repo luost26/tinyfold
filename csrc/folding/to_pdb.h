@@ -39,10 +39,10 @@ struct AminoAcid {
     std::string to_pdb(int &count_atoms, int resseq) {
         char buf[1024];
         int loc = 0;
-        loc += sprintf(buf + loc, pdb_atom_format, ++count_atoms, " N  ", aaname, "A", resseq, pos_N[0], pos_N[1], pos_N[2], 1.0, 0.0, 'N');
-        loc += sprintf(buf + loc, pdb_atom_format, ++count_atoms, " CA ", aaname, "A", resseq, pos_CA[0], pos_CA[1], pos_CA[2], 1.0, 0.0, 'C');
-        loc += sprintf(buf + loc, pdb_atom_format, ++count_atoms, " C  ", aaname, "A", resseq, pos_C[0], pos_C[1], pos_C[2], 1.0, 0.0, 'C');
-        loc += sprintf(buf + loc, pdb_atom_format, ++count_atoms, " O  ", aaname, "A", resseq, pos_O[0], pos_O[1], pos_O[2], 1.0, 0.0, 'O');
+        loc += snprintf(buf + loc, 100, pdb_atom_format, ++count_atoms, " N  ", aaname, "A", resseq, pos_N[0], pos_N[1], pos_N[2], 1.0, 0.0, 'N');
+        loc += snprintf(buf + loc, 100, pdb_atom_format, ++count_atoms, " CA ", aaname, "A", resseq, pos_CA[0], pos_CA[1], pos_CA[2], 1.0, 0.0, 'C');
+        loc += snprintf(buf + loc, 100, pdb_atom_format, ++count_atoms, " C  ", aaname, "A", resseq, pos_C[0], pos_C[1], pos_C[2], 1.0, 0.0, 'C');
+        loc += snprintf(buf + loc, 100, pdb_atom_format, ++count_atoms, " O  ", aaname, "A", resseq, pos_O[0], pos_O[1], pos_O[2], 1.0, 0.0, 'O');
         return std::string(buf);
     }
 };

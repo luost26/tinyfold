@@ -26,6 +26,7 @@ int main(int argc, char **argv) {
     ADD_TEST(test_transformer);
     ADD_TEST(test_esm_small);
     ADD_TEST(test_esm_full_3B);
+    ADD_TEST(test_memory_saving_pair_feature_accumulation);
     ADD_TEST(benchmark_transformer);
     ADD_TEST(test_pseudo_quantize);
     ADD_TEST(test_quantize_4bit);

@@ -117,6 +117,12 @@ struct Adaptor {
         trunk_trunk2sm_z_weight(cfg.sm_c_z, cfg.c_z),
         trunk_trunk2sm_z_bias(cfg.sm_c_z, 1)
     {
+        if (cfg.c_z == cfg.esm_attns) {
+            std::cerr << "Adaptor: c_z cannot be the same as esm_attns, "
+                        << "because the adaptor relies on the number of dims to determine whether we are in memory saving mode"
+                        << std::endl;
+            exit(1);
+        }
         std::cerr << "Loading weights for Adaptor from " << dirpath << std::endl;
         load_(esm_s_mlp_0_layernorm_weight, dirpath + "/esm_s_mlp.0.weight.bin");
         load_(esm_s_mlp_0_layernorm_bias, dirpath + "/esm_s_mlp.0.bias.bin");
@@ -163,8 +169,12 @@ struct Adaptor {
         }
 
         // esm_z_mlp
-        fused_layer_norm_linear<ReLU>(esm_z, esm_z_mlp_0_layernorm_weight, esm_z_mlp_0_layernorm_bias, esm_z_mlp_1_linear_weight, esm_z_mlp_1_linear_bias, buffer.z);
-        linear_(buffer.z, esm_z_mlp_3_linear_weight, esm_z_mlp_3_linear_bias, &buffer.z_inplace_buffer);
+        if (esm_z.n_cols == cfg.esm_attns) {
+            fused_layer_norm_linear<ReLU>(esm_z, esm_z_mlp_0_layernorm_weight, esm_z_mlp_0_layernorm_bias, esm_z_mlp_1_linear_weight, esm_z_mlp_1_linear_bias, buffer.z);
+            linear_(buffer.z, esm_z_mlp_3_linear_weight, esm_z_mlp_3_linear_bias, &buffer.z_inplace_buffer);
+        } else if (esm_z.n_cols == cfg.c_z) {
+            linear(esm_z, esm_z_mlp_3_linear_weight, esm_z_mlp_3_linear_bias, buffer.z);
+        }
 
         // No recycling
         for (int i = 0; i < buffer.s.n_rows; i ++) {

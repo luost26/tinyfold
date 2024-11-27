@@ -5,7 +5,9 @@
 #include <memory>
 #include <string>
 #include <chrono>
+#include <cmath>
 #include "../matrix.h"
+#include "../kernels.h"
 #include "transformer.h"
 #include "alphabet.h"
 #include "transformer.h"
@@ -61,12 +63,52 @@ struct ESMRepresentation {
     matrix<float> esm_s_combine_normalized;
     matrix<float> s;
     matrix<float> z;
+
+    const bool memory_saving_mode;
+    matrix<float> z_moment1;
+    matrix<float> z_moment2;
+    matrix<float> z_layernorm_weight;
+    matrix<float> z_layernorm_bias;
+    matrix<float> z_linear_weight;
+    matrix<float> z_linear_bias;
+
+    bool is_finalized = false;
+
     ESMRepresentation(int seqlen, const ESMConfig &cfg, const matrix<float> &esm_s_combine_normalized):
         seqlen(seqlen),
         cfg(cfg),
         esm_s_combine_normalized(esm_s_combine_normalized),
         s(seqlen, cfg.embed_dim),
-        z(seqlen * seqlen, cfg.num_layers * cfg.attention_heads)
+        z(seqlen * seqlen, cfg.num_layers * cfg.attention_heads),
+        memory_saving_mode(false),
+        z_moment1(0, 0),
+        z_moment2(0, 0),
+        z_layernorm_weight(0, 0),
+        z_layernorm_bias(0, 0),
+        z_linear_weight(0, 0),
+        z_linear_bias(0, 0)
+    {}
+
+    ESMRepresentation(
+        int seqlen,
+        const ESMConfig &cfg,
+        const matrix<float> &esm_s_combine_normalized,
+        const matrix<float> &z_layernorm_weight,
+        const matrix<float> &z_layernorm_bias,
+        const matrix<float> &z_linear_weight,
+        const matrix<float> &z_linear_bias):
+        seqlen(seqlen),
+        cfg(cfg),
+        esm_s_combine_normalized(esm_s_combine_normalized),
+        s(seqlen, cfg.embed_dim),
+        z(seqlen * seqlen, z_linear_weight.n_rows),
+        memory_saving_mode(true),
+        z_moment1(seqlen * seqlen, 1),
+        z_moment2(seqlen * seqlen, 1),
+        z_layernorm_weight(z_layernorm_weight),
+        z_layernorm_bias(z_layernorm_bias),
+        z_linear_weight(z_linear_weight),
+        z_linear_bias(z_linear_bias)
     {}
 
     void accumulate_s(const matrix<float> &s_esm, int layer) {
@@ -78,13 +120,84 @@ struct ESMRepresentation {
         }
     }
 
+    void _finalize(int num_layers) {
+        if (is_finalized) {
+            std::cerr << "Already finalized" << std::endl;
+            exit(1);
+        }
+        is_finalized = true;
+        if (memory_saving_mode) {
+            int c_z = z.n_cols;
+            int in_channels = cfg.attention_heads * num_layers;
+            #pragma omp parallel for
+            for (int i = 0; i < seqlen; i ++) {
+                for (int j = 0; j < seqlen; j ++) {
+                    int z_loc = i * seqlen + j;
+                    float mean = *z_moment1(z_loc, 0) / in_channels;
+                    float var = *z_moment2(z_loc, 0) / in_channels - mean * mean;
+                    float inv_std = 1.0f / std::sqrt(var + 1e-5);
+                    float mean_div_std = mean * inv_std;
+                    for (int k = 0; k < c_z; k ++) {
+                        float Bl = *z_linear_bias(k, 0);
+                        float WnWl = 0.0;
+                        float BnWl = 0.0;
+                        for (int l = 0; l < z_layernorm_weight.n_rows; l ++) {
+                            WnWl += *z_layernorm_weight(l, 0) * *z_linear_weight(k, l);
+                            BnWl += *z_layernorm_bias(l, 0) * *z_linear_weight(k, l);
+                        }
+                        float z_original = *z(z_loc, k);
+                        *z(z_loc, k) = gelu_scalar(z_original * inv_std - mean_div_std * WnWl + BnWl + Bl);
+                    }
+                }
+            }
+        }
+    }
+
     void save_z(const matrix<float> &attn_weights, int layer) {
         // attn_weights: (num_heads * 1+seqlen+1, 1+seqlen+1)
-        for (int i = 0; i < seqlen; i ++) {
-            for (int j = 0; j < seqlen; j ++) {
-                for (int k = 0; k < cfg.attention_heads; k ++) {
-                    // NOTE: The order here is (j, i) according to esmfold.py L140
-                    *z(j * seqlen + i, layer * cfg.attention_heads + k) = *attn_weights(k * (seqlen + 2) + i + 1, j + 1);
+        if (is_finalized) {
+            std::cerr << "ESM Representation has been finalized. Please create a new one to accumulate new results." << std::endl;
+            exit(1);
+        }
+        if (memory_saving_mode) {
+            int c_z = z.n_cols;
+            int in_channel_start = layer * cfg.attention_heads;
+            #pragma omp parallel for
+            for (int i = 0; i < seqlen; i ++) {
+                for (int j = 0; j < seqlen; j ++) {
+                    int z_loc = j * seqlen + i;
+                    for (int k = 0; k < cfg.attention_heads; k ++) {
+                        int attn_row = k * (seqlen + 2) + i + 1;
+                        int attn_col = j + 1;
+                        float aw = *attn_weights(attn_row, attn_col);
+                        *z_moment1(z_loc, 0) += aw;
+                        *z_moment2(z_loc, 0) += aw * aw;
+                    }
+
+                    for (int l = 0; l < c_z; l ++) {
+                        float sum = 0.0f;
+                        for (int k = 0; k < cfg.attention_heads; k ++) {
+                            int attn_row = k * (seqlen + 2) + i + 1;
+                            int attn_col = j + 1;
+                            float attn = *attn_weights(attn_row, attn_col);
+                            float w_layernorm = *z_layernorm_weight(in_channel_start + k, 0);
+                            float w_linear = *z_linear_weight(l, in_channel_start + k);
+                            sum += attn * w_layernorm * w_linear;
+                        }
+                        *z(z_loc, l) += sum;
+                    }
+                }
+            }
+            if (layer == cfg.num_layers - 1) {
+                _finalize(cfg.num_layers);
+            }
+        } else {
+            for (int i = 0; i < seqlen; i ++) {
+                for (int j = 0; j < seqlen; j ++) {
+                    for (int k = 0; k < cfg.attention_heads; k ++) {
+                        // NOTE: The order here is (j, i) according to esmfold.py L140
+                        *z(j * seqlen + i, layer * cfg.attention_heads + k) = *attn_weights(k * (seqlen + 2) + i + 1, j + 1);
+                    }
                 }
             }
         }

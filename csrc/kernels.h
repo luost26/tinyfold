@@ -4,6 +4,11 @@
 #include <omp.h>
 #include "matrix.h"
 
+template <typename T>
+inline T gelu_scalar(const T x) {
+    return x * 0.5 * (1.0 + erf(x / SQRT2));
+}
+
 template <ActivationType act_type = None, typename T>
 inline void linear(const matrix<T> &in, const matrix<T> &weight, const matrix<T> &bias, matrix<T> &out) {
     // in: (batch, in_channels)
@@ -146,7 +151,7 @@ void fused_layer_norm_linear(const matrix<T> &in, const matrix<T> &norm_weight, 
             if constexpr (act_type == ReLU) {
                 sum = sum > 0 ? sum : 0;
             } else if (act_type == GELU) {
-                sum = sum * 0.5 * (1.0 + erf(sum / SQRT2));
+                sum = gelu_scalar(sum);
             }
             *out(i, j) = sum;
         }
