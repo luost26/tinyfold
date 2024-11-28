@@ -6,6 +6,7 @@ from torch import nn
 import pickle
 from functools import partial
 from tinyfold.models.esmfold import ESMFold
+import awq_visualization as awq
 
 @click.command()
 @click.option("data_path", "--data", type=click.Path(exists=True), default="./data/testset/family_0.pkl")

@@ -204,7 +204,20 @@ def get_calib_feat_and_weight(model, data_path):
     
     return input_dict, weight_dict   
 
-def visualize(name, status, weights, activations, output_dir):
+def visualize(name, status, weights, activations, zlim, output_dir):
+    activations = activations.numpy()
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    x = np.arange(activations.shape[1])
+    y = np.arange(activations.shape[0])
+    x, y = np.meshgrid(x, y)
+    surf = ax.plot_surface(x, y, activations, cmap=cm.coolwarm, cstride=10, rstride=8, vmin=0, vmax=0.4, linewidth=0, antialiased=False)
+    ax.set_xlabel("Channel")
+    ax.set_ylabel("Token")
+    ax.set_zlim(0, zlim)
+    # fig.colorbar(surf, shrink=0.5, aspect=5)
+    plt.savefig(output_dir / f"{name}.self_attn.qkv_proj.activation.{status}_AWQ.png")
+    
     qkv = ["q", "k", "v"]
     for i, w in enumerate(weights):
         w = w.numpy()
@@ -213,26 +226,14 @@ def visualize(name, status, weights, activations, output_dir):
         x = np.arange(w.shape[1])
         y = np.arange(w.shape[0])
         x, y = np.meshgrid(x, y)
-        surf = ax.plot_surface(x, y, w, cmap=cm.coolwarm, vmin=0, vmax = 0.5, linewidth=0, antialiased=False)
+        surf = ax.plot_surface(x, y, w, cmap=cm.coolwarm, cstride=10, rstride=8, vmin=0, vmax=0.4, linewidth=0, antialiased=False)
         ax.set_xlabel("Out Channel")
         ax.set_ylabel("In Channel")
-        ax.set_zlim(0, 6)
-        # fig.colorbar(surf, shrink=0.4, aspect=5)
+        ax.set_zlim(0, zlim)
+        # fig.colorbar(surf, shrink=0.5, aspect=5)
         plt.savefig(output_dir / f"{name}.self_attn.{qkv[i]}_proj.weight.{status}_AWQ.png")
     
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    x = np.arange(activations.shape[1])
-    y = np.arange(activations.shape[0])
-    x, y = np.meshgrid(x, y)
-    surf = ax.plot_surface(x, y, activations, cmap=cm.coolwarm, vmin=0, vmax = 0.125, linewidth=0, antialiased=False)
-    ax.set_xlabel("Channel")
-    ax.set_ylabel("Token")
-    ax.set_zlim(0, 6)
-    # fig.colorbar(surf, shrink=0.4, aspect=5)
-    plt.savefig(output_dir / f"{name}.self_attn.qkv_proj.activation.{status}_AWQ.png")
-    
-    print(f"Visualize weights and activations {status} AWQ in {output_dir}.") 
+    print(f"Visualize weights and activations {status} AWQ in {output_dir}.")
     
 
 @click.command()
@@ -260,14 +261,15 @@ def main(esm_path: str, esmfold_path: str, data_path: str, output_dir: pathlib.P
     input_dict, weight_dict = get_calib_feat_and_weight(model, data_path)
     weights = [weight_dict[layer + f".self_attn.{qkv}_proj"] for qkv in ["q", "k", "v"]]
     activations = torch.stack(input_dict[layer + ".self_attn.q_proj"])
-    visualize(name=layer, status="before", weights=weights, activations=activations, output_dir=output_dir)
+    max_act = torch.max(activations).item()
+    visualize(name=layer, status="before", weights=weights, activations=activations, zlim=max_act, output_dir=output_dir)
     
     best_scales = model_weight_auto_scale(model, input_feat=input_dict, w_bit=w_bit)
     
     for w in weights:
         w *= best_scales[layer]
     activations /= best_scales[layer]
-    visualize(name=layer, status="after", weights=weights, activations=activations, output_dir=output_dir)
+    visualize(name=layer, status="after", weights=weights, activations=activations, zlim=max_act, output_dir=output_dir)
 
 if __name__ == "__main__":
     main()
