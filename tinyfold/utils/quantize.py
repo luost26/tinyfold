@@ -41,13 +41,15 @@ def pseudo_quantize_tensor(w, n_bit=4, q_group_size_candidates=[-1]):
     assert torch.isnan(scales).sum() == 0
     assert torch.isnan(w).sum() == 0
 
+    assert w.dim() == 2 and w.size(0) == scales.size(0)
+    if q_group_size > 0:
+        assert w.size(1) == q_group_size
+        
     # Quantize W: Map values in the range [\beta, \alpha] to lie within [0, 2^b - 1] (Formula 3)
     w = torch.clamp(torch.round(w / scales) + zeros, 0, max_int)
-    assert w.dim() == 2 and w.size(0) == scales.size(0) and w.size(1) == q_group_size
 
     # Dequantize W (pseudo quantization, the inverse transformation of Formula 3)
     w = (w - zeros) * scales
-    assert w.dim() == 2 and w.size(0) == scales.size(0) and w.size(1) == q_group_size
 
     assert torch.isnan(w).sum() == 0
 
