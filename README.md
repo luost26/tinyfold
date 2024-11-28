@@ -44,7 +44,7 @@ python ./scripts/create_testset.py
 python ./scripts/awq_visualization.py <--layer {visualized-layer} (optional)>
 ```
 
-If `visualized-layer` is not provided, the qkv projection layers in the second Transformer layer 'esm.layers.1' will be visualized in 'data/output/awq'.
+If `visualized-layer` is not provided, the qkv projection layers in the second Transformer layer `esm.layers.1` will be visualized in `data/output/awq`.
 
 ## Export ESMFold Parameters
 
