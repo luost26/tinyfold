@@ -285,6 +285,7 @@ class TransformerLayer(nn.Module):
             self.attention_heads,
             use_rotary_embeddings=self.use_rotary_embeddings,
         )
+        # For AWQ for the qkv linear projection in MultiheadAttention 
         self.self_attn_qkv_proj_scale = None
         
         self.self_attn_layer_norm = nn.LayerNorm(self.embed_dim)

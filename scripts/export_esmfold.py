@@ -18,7 +18,7 @@ from tinyfold.utils.awq import get_calib_feat_and_weight, model_weight_auto_scal
     default="./data/esmfold_structure_module_only_3B.pt",
 )
 @click.option("output_dir", "--out", type=click.Path(path_type=pathlib.Path), default="./data/esmfold_fp32")
-@click.option("--awq", is_flag=True, default=True, help="Export ESMfold with AWQ")
+@click.option("--awq", is_flag=True, default=False, help="Export ESMfold with AWQ")
 @click.option("--w_bit", default=4)
 
 def main(esm_path: str, esmfold_path: str, data_path: str, output_dir: pathlib.Path, awq: bool, w_bit: int, device: str):
@@ -34,8 +34,9 @@ def main(esm_path: str, esmfold_path: str, data_path: str, output_dir: pathlib.P
         torch.set_grad_enabled(False)
         input_dict, _ = get_calib_feat_and_weight(calib_model, data_path)
         best_scales = model_weight_auto_scale(calib_model, input_feat=input_dict, w_bit=w_bit)
+        awq_layers = best_scales.keys()
         for name, module in model.named_modules():
-            if isinstance(module, TransformerLayer) and ".0" not in name:
+            if name in awq_layers:
                 module.self_attn_qkv_proj_scale = best_scales[name]
                      
     print("Exporting model")
