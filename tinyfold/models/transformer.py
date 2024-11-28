@@ -285,6 +285,8 @@ class TransformerLayer(nn.Module):
             self.attention_heads,
             use_rotary_embeddings=self.use_rotary_embeddings,
         )
+        self.self_attn_qkv_proj_scale = None
+        
         self.self_attn_layer_norm = nn.LayerNorm(self.embed_dim)
 
         self.fc1 = nn.Linear(self.embed_dim, self.ffn_embed_dim)
@@ -331,8 +333,15 @@ class TransformerLayer(nn.Module):
 
     def export(self, dirpath: str | Path) -> None:
         dirpath = Path(dirpath)
-        export_tensor_dict(self.state_dict(), dirpath)
-        # torch.save(self.state_dict(), dirpath / "state_dict.pt")
+        sd = self.state_dict()
+        awq_scale = self.self_attn_qkv_proj_scale
+        if awq_scale != None:
+            sd["self_attn.q_proj.weight"] *= awq_scale
+            sd["self_attn.k_proj.weight"] *= awq_scale
+            sd["self_attn.v_proj.weight"] *= awq_scale
+            sd["self_attn.qkv_proj.scale"] = awq_scale
+        export_tensor_dict(sd, dirpath)
+        # torch.save(sd, dirpath / "state_dict.pt")
         export_value_list(
             [
                 self.embed_dim,
