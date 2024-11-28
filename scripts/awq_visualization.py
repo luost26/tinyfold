@@ -100,13 +100,16 @@ def auto_scale_block(module, name, input_feat, w_bit, q_group_size):
         assert scales.shape == s_x.shape
         scales = scales / (scales.max() * scales.min()).sqrt().view(1, -1)
 
-        for fc in linears2scale:
-            scales = scales.to(fc.weight.device)
-            # Scale up the values of the weight channels
-            fc.weight.mul_(scales)
-            fc.weight.data = pseudo_quantize_tensor(fc.weight.data, w_bit, q_group_size)
-            # Step 3: Scale back down the values of the weight channels
-            fc.weight.data = fc.weight.data / scales
+        for n, module in block.named_modules():
+            if module in linears2scale:
+                scales = scales.to(module.weight.device)
+                # Scale up the values of the weight channels
+                module.weight.mul_(scales)
+                module.weight.data = pseudo_quantize_tensor(module.weight.data, w_bit, q_group_size)
+                # Step 3: Scale back down the values of the weight channels
+                module.weight.data = module.weight.data / scales
+            elif isinstance(module, nn.Linear):
+                module.weight.data = pseudo_quantize_tensor(module.weight.data, w_bit, q_group_size)
 
         out = block(x, **kwargs)
         if isinstance(out, tuple):
@@ -121,13 +124,16 @@ def auto_scale_block(module, name, input_feat, w_bit, q_group_size):
             assert scales.shape == s_x.shape
             scales = scales / (scales.max() * scales.min()).sqrt().view(1, -1)
 
-            for fc in linears2scale:
-                scales = scales.to(fc.weight.device)
-                # Scale up the values of the weight channels
-                fc.weight.mul_(scales)
-                fc.weight.data = pseudo_quantize_tensor(fc.weight.data, w_bit, q_group_size)
-                # Step 3: Scale back down the values of the weight channels
-                fc.weight.data = fc.weight.data / scales
+            for n, module in block.named_modules():
+                if module in linears2scale:
+                    scales = scales.to(module.weight.device)
+                    # Scale up the values of the weight channels
+                    module.weight.mul_(scales)
+                    module.weight.data = pseudo_quantize_tensor(module.weight.data, w_bit, q_group_size)
+                    # Step 3: Scale back down the values of the weight channels
+                    module.weight.data = module.weight.data / scales
+                elif isinstance(module, nn.Linear):
+                    module.weight.data = pseudo_quantize_tensor(module.weight.data, w_bit, q_group_size)
 
             out = block(x, **kwargs)
             if isinstance(out, tuple):
