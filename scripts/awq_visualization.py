@@ -94,6 +94,26 @@ def auto_scale_block(module, name, input_feat, w_bit, q_group_size):
         history = []
 
         org_sd = {k: v.cpu() for k, v in block.state_dict().items()}
+        
+        # Calculate the quantization errors without scaling
+        scales = torch.ones(s_x.size(), dtype=s_x.dtype).to(s_x.device)
+        assert scales.shape == s_x.shape
+        scales = scales / (scales.max() * scales.min()).sqrt().view(1, -1)
+
+        for fc in linears2scale:
+            scales = scales.to(fc.weight.device)
+            # Scale up the values of the weight channels
+            fc.weight.mul_(scales)
+            fc.weight.data = pseudo_quantize_tensor(fc.weight.data, w_bit, q_group_size)
+            # Step 3: Scale back down the values of the weight channels
+            fc.weight.data = fc.weight.data / scales
+
+        out = block(x, **kwargs)
+        if isinstance(out, tuple):
+            out = out[0]
+
+        original_loss = (org_out - out).float().pow(2).mean().item()  # float prevents overflow
+        
         for ratio in range(n_grid):
             ratio = ratio * 1 / n_grid
             # Calculate the scales by the formula: scales = s_x^ratio
@@ -129,25 +149,27 @@ def auto_scale_block(module, name, input_feat, w_bit, q_group_size):
         best_scales = best_scales.view(-1)
 
         assert torch.isnan(best_scales).sum() == 0, best_scales
-        return best_scales.detach()
+        return best_scales.detach(), (1 - best_error / original_loss)
 
     # onyl do AWQ for qkv projection in transformer layers
     inp = input_feat[name + '.self_attn.q_proj']
     inp = torch.cat([x.unsqueeze(0) for x in inp], dim=0).unsqueeze(0)
     qkv = [module.self_attn.q_proj, module.self_attn.k_proj, module.self_attn.v_proj]
-    final_scales = _search_module_scale(module, qkv, inp)
+    final_scales, loss_reduction = _search_module_scale(module, qkv, inp)
     scale_ln_fcs(module.self_attn_layer_norm, qkv, final_scales)
     
-    return final_scales.cpu()
+    return final_scales.cpu(), loss_reduction
 
 def model_weight_auto_scale(model, input_feat, w_bit=4, q_group_size=-1):
     from tinyfold.models.transformer import TransformerLayer
 
     best_scale_dict = dict()
+    all_loss_reduction = []
     for name, module in model.named_modules():
         if isinstance(module, TransformerLayer) and ".0" not in name:
-            best_scale_dict[name] = auto_scale_block(module, name, input_feat, w_bit, q_group_size)
-            
+            best_scale_dict[name], loss_reduction = auto_scale_block(module, name, input_feat, w_bit, q_group_size)
+            all_loss_reduction.append(loss_reduction)
+    print(f"Average quantization error reduction across all transformer layers with AWQ: {sum(all_loss_reduction) / len(all_loss_reduction):.0%}")        
     return best_scale_dict
     
 def get_calib_feat_and_weight(model, data_path):
