@@ -52,7 +52,7 @@ If `visualized-layer` is not provided, the qkv projection layers in the second T
 python ./scripts/export_esmfold.py <--out {export-path} (optional)> <--awq (optional)>
 ```
 
-If `export-path` is not provided, the weights will be exported to `data/esmfold_fp32`.
+If `export-path` is not provided, the weights will be exported to `data/esmfold_fp32`.\
 Please first generate calibration data if you want to apply AWQ.
 
 ## Run TinyFold
