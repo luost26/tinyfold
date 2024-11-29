@@ -37,7 +37,7 @@ def main(esm_path: str, esmfold_path: str, data_path: str, output_dir: pathlib.P
         awq_layers = best_scales.keys()
         for name, module in model.named_modules():
             if name in awq_layers:
-                module.self_attn_qkv_proj_scale = best_scales[name]
+                module.self_attn_qkv_proj_awq_scale = best_scales[name]
                      
     print("Exporting model")
     model.export(output_dir)

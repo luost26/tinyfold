@@ -5,6 +5,7 @@
 #include <fstream>
 #include <chrono>
 #include <filesystem>
+#include <string>
 #include "../matrix.h"
 #include "../kernels.h"
 #include "../utils/timer.h"
@@ -86,18 +87,25 @@ void smart_load_(quantized_matrix<Q4, block_size> & A, const std::string & path)
     }
 }
 
+enum AWQState {
+    AWQDisabled = 0,
+    AWQEnabled = 1,
+};
+
 template <typename WeightType=matrix<float>>
 struct TransformerLayer {
     TransformerConfig cfg;
     matrix<float> self_attn_layer_norm_weight;
     matrix<float> self_attn_layer_norm_bias;
 
+    bool awq_state;
     WeightType k_proj_weight;
     matrix<float> k_proj_bias;
     WeightType v_proj_weight;
     matrix<float> v_proj_bias;
     WeightType q_proj_weight;
     matrix<float> q_proj_bias;
+    matrix<float> qkv_proj_awq_scale;
     WeightType out_proj_weight;
     matrix<float> out_proj_bias;
 
@@ -118,6 +126,7 @@ struct TransformerLayer {
         v_proj_bias(cfg.embed_dim, 1),
         q_proj_weight(cfg.embed_dim, cfg.embed_dim),
         q_proj_bias(cfg.embed_dim, 1),
+        qkv_proj_awq_scale(cfg.embed_dim, 1),
         out_proj_weight(cfg.embed_dim, cfg.embed_dim),
         out_proj_bias(cfg.embed_dim, 1),
         final_layer_norm_weight(cfg.embed_dim, 1),
@@ -130,6 +139,13 @@ struct TransformerLayer {
         load_(self_attn_layer_norm_weight, dirpath + "/self_attn_layer_norm.weight.bin");
         load_(self_attn_layer_norm_bias, dirpath + "/self_attn_layer_norm.bias.bin");
         smart_load_(k_proj_weight, dirpath + "/self_attn.k_proj.weight.bin");
+        if (std::filesystem::exists(dirpath + "/self_attn.qkv_proj.awq_scale.bin")) {
+            awq_state = AWQEnabled;
+            load_(qkv_proj_awq_scale, dirpath + "/self_attn.qkv_proj.awq_scale.bin");
+        }
+        else {
+            awq_state = AWQDisabled;
+        }
         load_(k_proj_bias, dirpath + "/self_attn.k_proj.bias.bin");
         smart_load_(v_proj_weight, dirpath + "/self_attn.v_proj.weight.bin");
         load_(v_proj_bias, dirpath + "/self_attn.v_proj.bias.bin");
@@ -164,6 +180,9 @@ struct TransformerLayer {
         START_TIMER();
 
         layer_norm(x, self_attn_layer_norm_weight, self_attn_layer_norm_bias, y); RECORD_TIME("layer_norm");
+        if (awq_state == AWQEnabled) {
+            channel_scale_(y, qkv_proj_awq_scale);
+        }
         attn_proj_linear(y, q_proj_weight, q_proj_bias, buffer.q, &buffer.dequant); RECORD_TIME("q_proj_linear");
         attn_proj_linear(y, k_proj_weight, k_proj_bias, buffer.k, &buffer.dequant); RECORD_TIME("k_proj_linear");
         apply_rotary_embedding_(buffer.q, cfg.num_heads); RECORD_TIME("apply_rotary_embedding");

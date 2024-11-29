@@ -268,6 +268,16 @@ inline void mul_(matrix<T> &A, T b) {
 
 
 template <typename T>
+void channel_scale_(matrix<T> &A, matrix<T> &B) {
+    for (int i = 0; i < A.n_rows; i++) {
+        for (int j = 0; j < A.n_cols; j++) {
+            *A(i, j) /= *B(j, 0);
+        }
+    }
+}
+
+
+template <typename T>
 inline bool allclose(const matrix<T> &A, const matrix<T> &B, T atol = 1e-6, T * error_output = nullptr) {
     if (A.n_rows != B.n_rows || A.n_cols != B.n_cols) {
         return false;

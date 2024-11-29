@@ -286,7 +286,7 @@ class TransformerLayer(nn.Module):
             use_rotary_embeddings=self.use_rotary_embeddings,
         )
         # For AWQ for the qkv linear projection in MultiheadAttention 
-        self.self_attn_qkv_proj_scale = None
+        self.self_attn_qkv_proj_awq_scale = None
         
         self.self_attn_layer_norm = nn.LayerNorm(self.embed_dim)
 
@@ -335,12 +335,12 @@ class TransformerLayer(nn.Module):
     def export(self, dirpath: str | Path) -> None:
         dirpath = Path(dirpath)
         sd = self.state_dict()
-        awq_scale = self.self_attn_qkv_proj_scale
+        awq_scale = self.self_attn_qkv_proj_awq_scale
         if awq_scale != None:
             sd["self_attn.q_proj.weight"] *= awq_scale
             sd["self_attn.k_proj.weight"] *= awq_scale
             sd["self_attn.v_proj.weight"] *= awq_scale
-            sd["self_attn.qkv_proj.scale"] = awq_scale
+            sd["self_attn.qkv_proj.awq_scale"] = awq_scale.unsqueeze(1)
         export_tensor_dict(sd, dirpath)
         # torch.save(sd, dirpath / "state_dict.pt")
         export_value_list(
