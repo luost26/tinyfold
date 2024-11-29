@@ -5,7 +5,6 @@
 #include <fstream>
 #include <chrono>
 #include <filesystem>
-#include <string>
 #include "../matrix.h"
 #include "../kernels.h"
 #include "../utils/timer.h"
