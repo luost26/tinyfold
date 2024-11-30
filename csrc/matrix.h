@@ -269,6 +269,7 @@ inline void mul_(matrix<T> &A, T b) {
 
 template <typename T>
 void channel_scale_(matrix<T> &A, matrix<T> &B) {
+    #pragma omp parallel for
     for (int i = 0; i < A.n_rows; i++) {
         for (int j = 0; j < A.n_cols; j++) {
             *A(i, j) /= *B(j, 0);
