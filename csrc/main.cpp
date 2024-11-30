@@ -4,7 +4,7 @@
 
 
 template <typename WeightType>
-int main_loop(const std::string &model_dir) {
+int main_loop(const std::string &model_dir, std::vector<std::string> &in_seqs) {
     std::unique_ptr<TinyFold<WeightType>> tinyfold(load_tinyfold<WeightType>(model_dir));
     std::filesystem::create_directory("output");
 
@@ -15,11 +15,17 @@ int main_loop(const std::string &model_dir) {
             continue;
         }
         std::string seq;
-        std::cout << "SEQ: ";
-        std::cin >> seq;
-        if (seq.empty()) {
-            std::cout << "Exiting..." << std::endl;
-            break;
+        if (!in_seqs.empty()) {
+            seq = in_seqs[0];
+            in_seqs.erase(in_seqs.begin());
+            std::cout << "SEQ: " << seq << std::endl;
+        } else {
+            std::cout << "SEQ: ";
+            std::cin >> seq;
+            if (seq.empty()) {
+                std::cout << "Exiting..." << std::endl;
+                break;
+            }
         }
         std::string pdb = tinyfold->operator()(seq);
         if (pdb.empty()) {
@@ -39,17 +45,29 @@ int main_loop(const std::string &model_dir) {
         ASAWPEEKNYHQPAILNSSALRQIAEGTSISEMWQNDLQPLLIERYPGSPGSYAARQHIMQRIQRLQADWVLEIDTFLSQTPYGYRSFSNIISTLNPTAKRHLVLACHYDSKYFSHWNNRVFVGATDS
   */
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <model_dir>" << std::endl;
+    if (argc != 2 && argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <model_dir> <optional:seq_path>" << std::endl;
         return 1;
     }
     std::string model_dir(argv[1]);
+    std::vector<std::string> in_seqs;
+    if (argc == 3) {
+        std::ifstream in_seqs_file(argv[2]);
+        if (!in_seqs_file.is_open()) {
+            std::cerr << "Failed to open " << argv[2] << std::endl;
+            return 1;
+        }
+        std::string seq;
+        while (std::getline(in_seqs_file, seq)) {
+            in_seqs.push_back(seq);
+        }
+    }
 
     if (std::getenv("FP32") != nullptr) {
         std::cout << "TinyFold: Using FP32 model" << std::endl;
-        return main_loop<Weight_FP32>(model_dir);
+        return main_loop<Weight_FP32>(model_dir, in_seqs);
     } else {
         std::cout << "TinyFold: Using Q4 (4-bit quantized) model" << std::endl;
-        return main_loop<Weight_Q4>(model_dir);
+        return main_loop<Weight_Q4>(model_dir, in_seqs);
     }
 }
