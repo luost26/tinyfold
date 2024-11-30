@@ -233,6 +233,20 @@ struct ESM {
             std::cerr << "No transformer layers" << std::endl;
             exit(1);
         }
+
+        std::vector<int> awq_enabled_layers;
+        for (int i = 0; i < cfg.num_layers; i ++) {
+            if (transformer_layers[i]->awq_state == AWQEnabled) {
+                awq_enabled_layers.push_back(i);
+            }
+        }
+        if (awq_enabled_layers.size() > 0) {
+            std::cerr << "AWQ is enabled for layer: ";
+            for (int i = 0; i < awq_enabled_layers.size(); i ++) {
+                std::cerr << awq_enabled_layers[i] << " ";
+            }
+            std::cerr << std::endl;
+        }
     }
 
     ESMBuffer * create_buffer(const matrix<int> &esm_aatype) {
