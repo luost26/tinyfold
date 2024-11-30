@@ -65,18 +65,29 @@ def main(testset_path: Path, output_dir: Path):
     results = []
     for pdb_path in output_dir.glob("*.pdb"):
         seq, dist = load_pdb(pdb_path)
-        lddt = compute_lddt(dist, torch.tensor(seq_to_data[seq]["dist"], dtype=torch.float))
+        data = seq_to_data[seq]
+        dist_true = torch.tensor(data["dist"], dtype=torch.float)
+        scope_id = data["scop_id"]
+        lddt = compute_lddt(dist, dist_true)
+        if "_" in pdb_path.stem:
+            prefix = pdb_path.stem.split("_")[0]
+        else:
+            prefix = "-"
         results.append({
+            "prefix": prefix,
             "pdb_path": pdb_path,
-            "scop_id": seq_to_data[seq]["scop_id"],
+            "scop_id": scope_id,
             "lddt": lddt.item(),
             "seq": seq,
         })
         print(f"{pdb_path.name}: {lddt:.3f}")
 
     df = pd.DataFrame(results)
+    df.sort_values("pdb_path", inplace=True)
+    df.reset_index(drop=True, inplace=True)
     print(df)
-    print(f"Mean LDDT: {df['lddt'].mean():.4f}")
+    print("Mean LDDT:")
+    print(df[["prefix", "lddt"]].groupby("prefix").mean())
     df.to_csv(output_dir / "results.csv", index=False)
 
 

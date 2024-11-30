@@ -8,8 +8,12 @@ int main_loop(const std::string &model_dir, std::vector<std::string> &in_seqs) {
     std::unique_ptr<TinyFold<WeightType>> tinyfold(load_tinyfold<WeightType>(model_dir));
     std::filesystem::create_directory("output");
 
+    std::string out_prefix = "";
+    if (std::getenv("OUT_PREFIX") != nullptr) {
+        out_prefix = std::string(std::getenv("OUT_PREFIX")) + "_";
+    }
     for (int i = 0;;i ++) {
-        std::string out_filename = "output/" + std::to_string(i).insert(0, 4 - std::to_string(i).length(), '0') + ".pdb";
+        std::string out_filename = "output/" + out_prefix + std::to_string(i).insert(0, 4 - std::to_string(i).length(), '0') + ".pdb";
         // If the output file already exists, skip
         if (std::filesystem::exists(out_filename)) {
             continue;
