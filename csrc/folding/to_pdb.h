@@ -31,6 +31,7 @@ struct AminoAcid {
     float pos_CA[3] = {0.0, 0.0, 0.0};
     float pos_C[3] = {0.0, 0.0, 0.0};
     float pos_O[3] = {0.0, 0.0, 0.0};
+    float pos_CB[3] = {0.0, 0.0, 0.0};
 
     AminoAcid(const char * aaname) {
         this->aaname = aaname;
@@ -43,6 +44,7 @@ struct AminoAcid {
         loc += snprintf(buf + loc, 100, pdb_atom_format, ++count_atoms, " CA ", aaname, "A", resseq, pos_CA[0], pos_CA[1], pos_CA[2], 1.0, 0.0, 'C');
         loc += snprintf(buf + loc, 100, pdb_atom_format, ++count_atoms, " C  ", aaname, "A", resseq, pos_C[0], pos_C[1], pos_C[2], 1.0, 0.0, 'C');
         loc += snprintf(buf + loc, 100, pdb_atom_format, ++count_atoms, " O  ", aaname, "A", resseq, pos_O[0], pos_O[1], pos_O[2], 1.0, 0.0, 'O');
+        loc += snprintf(buf + loc, 100, pdb_atom_format, ++count_atoms, " CB ", aaname, "A", resseq, pos_CB[0], pos_CB[1], pos_CB[2], 1.0, 0.0, 'C');
         return std::string(buf);
     }
 };
@@ -51,6 +53,7 @@ const float crd_N[3] = {-0.525, 1.363, 0.0};
 const float crd_CA[3] = {0.0, 0.0, 0.0};
 const float crd_C[3] = {1.526, 0.0, 0.0};
 const float crd_O[3] = {2.153, -1.062, 0.0};
+const float crd_CB[3] = {-0.529, -0.774, -1.205};
 
 std::string to_pdb(const matrix<float> &r, const matrix<int> aatype) {
     int seqlen = r.n_rows;
@@ -68,6 +71,7 @@ std::string to_pdb(const matrix<float> &r, const matrix<int> aatype) {
         apply_affine(r(i, 0), crd_CA, aa.pos_CA);
         apply_affine(r(i, 0), crd_C, aa.pos_C);
         apply_affine(r(i, 0), crd_O, aa.pos_O);
+        apply_affine(r(i, 0), crd_CB, aa.pos_CB);
     }
 
     for (int i = 0; i < seqlen - 1; i ++) {
