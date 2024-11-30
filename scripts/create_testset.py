@@ -47,6 +47,7 @@ def main(
     print("Length limit:", length_limit)
 
     output_path = output_root / f"testset/{split_by}_{split_index}.pkl"
+    outseq_path = output_root / f"testset/{split_by}_{split_index}_sequences.txt"
     if output_path.exists():
         click.confirm(f"{output_path} already exists. Overwrite?", abort=True)
 
@@ -72,6 +73,10 @@ def main(
 
     with open(output_path, "wb") as f:
         pickle.dump(out, f)
+
+    with open(outseq_path, "w") as f:
+        for data in out:
+            f.write(data["seq"] + "\n")
 
     print(f"Saved to {output_path}")
 
