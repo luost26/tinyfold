@@ -72,6 +72,7 @@ def main(
                     if seqlen < min_length or seqlen > max_length:
                         print(f"{scop_id} is too short/long ({seqlen}), ignoring")
                         continue
+                    data["scop_id"] = scop_id
                     out.append(data)
                     pbar.update(1)
                     if len(out) >= limit:

@@ -2,6 +2,7 @@ import pickle
 from pathlib import Path
 from tinyfold.models.openfold.residue_constants import restype_3to1
 
+import pandas as pd
 import torch
 import click
 
@@ -57,15 +58,26 @@ def main(testset_path: Path, output_dir: Path):
     with open(testset_path, "rb") as f:
         testset = pickle.load(f)
 
-    seq_to_cbdist: dict[str, torch.Tensor] = {}
+    seq_to_data: dict[str, torch.Tensor] = {}
     for data in testset:
-        seq_to_cbdist[data["seq"]] = torch.tensor(data["dist"], dtype=torch.float)
+        seq_to_data[data["seq"]] = data
 
+    results = []
     for pdb_path in output_dir.glob("*.pdb"):
         seq, dist = load_pdb(pdb_path)
-        lddt = compute_lddt(dist, seq_to_cbdist[seq])     
-
+        lddt = compute_lddt(dist, torch.tensor(seq_to_data[seq]["dist"], dtype=torch.float))
+        results.append({
+            "pdb_path": pdb_path,
+            "scop_id": seq_to_data[seq]["scop_id"],
+            "lddt": lddt.item(),
+            "seq": seq,
+        })
         print(f"{pdb_path.name}: {lddt:.3f}")
+
+    df = pd.DataFrame(results)
+    print(df)
+    print(f"Mean LDDT: {df['lddt'].mean():.4f}")
+    df.to_csv(output_dir / "results.csv", index=False)
 
 
 if __name__ == "__main__":
