@@ -2,6 +2,12 @@
 
 ![output](./assets/output.png)
 
+
+
+https://github.com/user-attachments/assets/46c9f297-52cf-420d-b7d8-d8530e89cea4
+
+
+
 TinyFold is an optimized version of ESMFold implemented with pure C++ and optimized with the activation-aware weight quantization (AWQ) and the memory-efficient accumulation techniques. TinyFold reduces memory cost by approximately 6 folds and achieves a speed-up of approximately 9 folds compared to ESMFold on CPUs.
 
 TinyFold is a final project for MIT [6.5940 TinyML and Efficient Deep Learning Computing](https://efficientml.ai/) (Fall 2024).
