@@ -12,7 +12,7 @@ TinyFold is an optimized version of ESMFold implemented with pure C++ and optimi
 
 TinyFold is a final project for MIT [6.5940 TinyML and Efficient Deep Learning Computing](https://efficientml.ai/) (Fall 2024).
 
-Authors: Shitong Luo\*, Yu-Cheng Wu\* (\*equal contribution, alphabetical order by last name)
+Authors: [Shitong Luo](https://luost.me/)\*, [Yu-Cheng Wu](https://peterwu-1031.github.io/)\* (\*equal contribution, alphabetical order by last name)
 
 ## Run TinyFold
 
