@@ -59,5 +59,5 @@ Please first generate calibration data if you want to apply AWQ.
 
 ```bash
 cd build
-./main ../data/esmfold_fp32
+./tinyfold ../data/esmfold_fp32
 ```
