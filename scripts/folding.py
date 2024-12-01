@@ -23,6 +23,11 @@ def main(esm_path: str, esmfold_path: str, device: str, output_dir: pathlib.Path
     model = ESMFold.load(esmfold_path, esm_path).to(device)
     model.eval()
 
+    count_esm_params = 0
+    for p in model.esm.parameters():
+        count_esm_params += p.numel()
+    print(f"ESM params: {count_esm_params}")
+
     torch.set_grad_enabled(False)
 
     cnt = 0
