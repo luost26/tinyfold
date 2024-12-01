@@ -1,6 +1,50 @@
 # TinyFold
 
-## Environment
+![output](./assets/output.png)
+
+TinyFold is an optimized version of ESMFold implemented with pure C++ and optimized with the activation-aware weight quantization (AWQ) and the memory-efficient accumulation techniques. TinyFold reduces memory cost by approximately 6 folds and achieves a speed-up of approximately 9 folds compared to ESMFold on CPUs.
+
+TinyFold is a final project for MIT [6.5940 TinyML and Efficient Deep Learning Computing](https://efficientml.ai/) (Fall 2024).
+
+Authors: Shitong Luo\*, Yu-Cheng Wu\* (\*equal contribution, alphabetical order by last name)
+
+## Run TinyFold
+
+1. Download and unarchive the pre-compiled TinyFold from [releases](https://github.com/luost26/tinyfold/releases).
+2. Download and unarchive the model weights from [here](https://www.dropbox.com/scl/fi/xfu3b4pwjz399y4n5eop5/tinyfold_awq.tar.gz?rlkey=5ox6dtwepmc1zcjoz6677g4k9&st=887nqbfh&dl=0).
+3. Run TinyFold and input protein sequences
+   ```bash
+   ./tinyfold <path-to-weights>
+   ```
+
+## Compile from Source
+
+### Prerequisite
+
+CMake and OpenMP are required to compile TinyFold. On macOS, these dependencies can be installed using homebrew:
+
+```
+brew install cmake libomp
+```
+
+### Compile
+
+Use the following commands to compile TinyFold:
+
+```
+mkdir build
+cd build
+cmake ..
+make
+```
+
+The compiled executable binary can be found at `build/tinyfold`.
+
+## Export Pre-trained Weights from Scratch
+
+### Prerequisite
+
+Install the conda environment using the commands below:
 
 ```bash
 conda env create --name tinyfold --file env.yml
@@ -8,34 +52,49 @@ conda activate tinyfold
 pip install -e .
 ```
 
-## Data
 
-Download pre-trained model weights:
+### Pre-trained Weights of ESMFold
+
+Download pre-trained model weights and SCOP datasets using the following script:
+
 ```bash
 bash ./data/download_all.sh
 ```
 
-## Build TinyFold
+### Export Weights (w/o AWQ)
 
 ```bash
-mkdir build
-cd build
-cmake ..
-make
+python ./scripts/export_esmfold.py --out <export-path>
 ```
 
-## Generate Unit Test Data
+### Export Weights (w/ AWQ)
 
-```bash
-python ./scripts/generate_test_data.py <test-case-name>
-```
-
-## Apply AWQ (Optional)
-
-### Generate Calibration Data
+First, generate calibration data:
 
 ```bash
 python ./scripts/create_testset.py
+```
+
+Next, export weights with AWQ scaling factors:
+
+```bash
+python ./scripts/export_esmfold.py --out <export-path> --awq
+```
+
+### Quantization
+
+The exported weights are in FP32. To quantize the weights, use the `export_quantized_weights` compiled from C++:
+
+```bash
+./build/export_quantized_weights <input-fp32-weight-path> <output-quantized-weight-path>
+```
+
+## Miscellaneous
+
+### Generate Unit Test Data
+
+```bash
+python ./scripts/generate_test_data.py <test-case-name>
 ```
 
 ### Visualize Weights and Activations Before/After AWQ
@@ -46,18 +105,3 @@ python ./scripts/awq_visualization.py <--layer {visualized-layer} (optional)>
 
 If `visualized-layer` is not provided, the qkv projection layers in the second Transformer layer `esm.layers.1` will be visualized in `data/output/awq`.
 
-## Export ESMFold Parameters
-
-```bash
-python ./scripts/export_esmfold.py <--out {export-path} (optional)> <--awq (optional)>
-```
-
-If `export-path` is not provided, the weights will be exported to `data/esmfold_fp32`.\
-Please first generate calibration data if you want to apply AWQ.
-
-## Run TinyFold
-
-```bash
-cd build
-./tinyfold ../data/esmfold_fp32
-```
