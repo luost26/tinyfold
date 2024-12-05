@@ -1,3 +1,5 @@
 *
 !.gitignore
 !download_all.sh
+!testset
+!testset/*.txt
