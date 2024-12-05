@@ -18,7 +18,7 @@ Authors: [Shitong Luo](https://luost.me/)\*, [Yu-Cheng Wu](https://peterwu-1031.
 
 1. Download and unarchive the pre-compiled TinyFold from [releases](https://github.com/luost26/tinyfold/releases).
 2. Download and unarchive the model weights from [here](https://www.dropbox.com/scl/fi/xfu3b4pwjz399y4n5eop5/tinyfold_awq.tar.gz?rlkey=5ox6dtwepmc1zcjoz6677g4k9&st=887nqbfh&dl=0).
-3. Run TinyFold and input protein sequences (10 demo sequences are provided [here](data/testset/family_0_sequences.txt))
+3. Run TinyFold and input a protein sequence (10 demo sequences are provided [here](data/testset/family_0_sequences.txt))
    ```bash
    ./tinyfold <path-to-weights>
    ```
