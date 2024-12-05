@@ -22,6 +22,7 @@ Authors: [Shitong Luo](https://luost.me/)\*, [Yu-Cheng Wu](https://peterwu-1031.
    ```bash
    ./tinyfold <path-to-weights>
    ```
+4. To view the predicted structure, drag the output `.pdb` file to [molstar.org/viewer](https://molstar.org/viewer).
 
 ## Compile from Source
 
